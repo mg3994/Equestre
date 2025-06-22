@@ -18,8 +18,27 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
-       
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.all(Colors.white),
+        checkColor: WidgetStateProperty.all(Colors.black),
+        side: const BorderSide(color: Colors.black),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+         
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+          textStyle: const TextStyle(fontSize: 16.0, ),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.zero,
+        ),
+        backgroundColor: Colors.brown[300], // Change to your preferred color
+        foregroundColor: Colors.black, // Text color
+        ),
+      ),
       ),
     initialRoute: '/',
     routes: {
