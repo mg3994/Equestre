@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:camerawesome/pigeon.dart';
 import 'package:equestre/src/recoding/widets/preview_dec.dart'
-    show PreviewDecorationWiget;
+    show  PreviewDecor;
 import 'package:equestre/utils/extensions/open.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -144,7 +144,7 @@ class _StartRecordingState extends State<StartRecording> {
 
   @override
   Widget build(BuildContext context) {
-      final screenSize = MediaQuery.of(context).size;
+      
     return Scaffold(
       body: eventId != null
           ? CameraAwesomeBuilder.awesome(
@@ -197,37 +197,14 @@ class _StartRecordingState extends State<StartRecording> {
                 );
               },
               
-                 pictureInPictureConfigBuilder: (index, sensor) {
-                  const width = 300.0;
-                  return PictureInPictureConfig(
-                    isDraggable: true,
-                    startingPosition: Offset(
-                      -50,
-                      screenSize.height - 420,
-                    ),
-                    onTap: () {
-                      debugPrint('on preview tap');
-                    },
-                    sensor: sensor,
-                    pictureInPictureBuilder: (preview, aspectRatio) {
-                      return SizedBox(
-                        width: width,
-                        height: width,
-                        child: ClipPath(
-                          clipper: _RectClipper(
-                            width: width,
-                            height: width * aspectRatio,
+                    // You can use the `previewDecoratorBuilder` parameter to overlay widgets (like picture-in-picture) on the camera preview.
+                    // This will NOT be recorded in the video, but will be visible to the user during recording.
+                    // Example: show a PiP widget with some data in the top-right corner.
 
-                          ),
-                          child: SizedBox(
-                            width: width,
-                            child: preview,
-                          ),
-                        ),
-                      );
+                    previewDecoratorBuilder: ( state, previewRect) {
+                      return PreviewDecor();
                     },
-                  );
-                },
+                   
             )
           : Center(child: Text('No event ID provided')),
       //        CameraAwesomeBuilder.custom(
