@@ -65,6 +65,15 @@ class _ManageRecordingsState extends State<ManageRecordings> {
   }
 
   Future<void> _deleteVideo(FileSystemEntity file) async {
+    var status = await Permission.manageExternalStorage.request();
+    if (!status.isGranted) {
+      if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Permission denied to manage files.')),
+      );
+      }
+      return;
+    }
     await file.delete();
     await _loadVideos();
     setState(() {
