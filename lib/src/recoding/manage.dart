@@ -37,7 +37,8 @@ class _ManageRecordingsState extends State<ManageRecordings> {
   Future<void> _loadVideos() async {
     Directory? downloadsDir;
     if (Platform.isAndroid) {
-      downloadsDir = Directory('/storage/emulated/0/Download/Equestre');
+      downloadsDir = await getDownloadsDirectory() ; //Directory('/storage/emulated/0/Download/Equestre');
+      downloadsDir = Directory(p.join(downloadsDir?.path ??Directory('/storage/emulated/0/Download/').path, 'Equestre'));
     } else if (Platform.isIOS) {
       downloadsDir = await getApplicationDocumentsDirectory();
       downloadsDir = Directory(p.join(downloadsDir.path, 'Equestre'));

@@ -144,6 +144,7 @@ class _StartRecordingState extends State<StartRecording> {
 
   @override
   Widget build(BuildContext context) {
+      final screenSize = MediaQuery.of(context).size;
     return Scaffold(
       body: eventId != null
           ? CameraAwesomeBuilder.awesome(
@@ -151,8 +152,9 @@ class _StartRecordingState extends State<StartRecording> {
                 pathBuilder: (sensors) async {
                   Directory? downloadsDir;
                   if (Platform.isAndroid) {
+                    downloadsDir = await getDownloadsDirectory() ;
                     downloadsDir = await Directory(
-                      '/storage/emulated/0/Download/Equestre',
+                     p.join(downloadsDir?.path ??Directory('/storage/emulated/0/Download/').path, 'Equestre')
                     ).create(recursive: true);
                   } else if (Platform.isIOS) {
                     downloadsDir = await getApplicationDocumentsDirectory();
@@ -194,11 +196,38 @@ class _StartRecordingState extends State<StartRecording> {
                   single: (single) => single.file?.open(),
                 );
               },
-              previewDecoratorBuilder: (state, preview) {
-                // This will be shown above the preview (in a Stack)
-                // It could be used in combination with MLKit to draw filters on faces for example
-                return PreviewDecorationWiget(state: state, preview: preview);
-              },
+              
+                 pictureInPictureConfigBuilder: (index, sensor) {
+                  const width = 300.0;
+                  return PictureInPictureConfig(
+                    isDraggable: true,
+                    startingPosition: Offset(
+                      -50,
+                      screenSize.height - 420,
+                    ),
+                    onTap: () {
+                      debugPrint('on preview tap');
+                    },
+                    sensor: sensor,
+                    pictureInPictureBuilder: (preview, aspectRatio) {
+                      return SizedBox(
+                        width: width,
+                        height: width,
+                        child: ClipPath(
+                          clipper: _RectClipper(
+                            width: width,
+                            height: width * aspectRatio,
+
+                          ),
+                          child: SizedBox(
+                            width: width,
+                            child: preview,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
             )
           : Center(child: Text('No event ID provided')),
       //        CameraAwesomeBuilder.custom(
@@ -216,4 +245,27 @@ class _StartRecordingState extends State<StartRecording> {
       // : SizedBox.shrink()
     );
   }
+}
+
+
+
+
+class _RectClipper extends CustomClipper<Path> {
+  final double width;
+  final double height;
+
+  _RectClipper({required this.width, required this.height});
+
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    path.moveTo(width / 2, 0); // Top center
+    path.lineTo(0, height);    // Bottom left
+    path.lineTo(width, height); // Bottom right
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }
