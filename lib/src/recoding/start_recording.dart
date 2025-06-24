@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -26,16 +27,34 @@ class _StartRecordingState extends State<StartRecording> {
   SensorDeviceData? sensorDeviceData;
   bool? isMultiCamSupported;
   PipShape shape = PipShape.circle;
+  Timer? _horseTimer;
+  int _horseNumber = 7; // initial horse number
 
   @override
   void initState() {
     super.initState();
+
+    // Start the timer to increment horse number every second
+    _horseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _horseNumber++;
+        final horse = HorseInfo(
+          name: "Thunderbolt",
+          number: _horseNumber,
+          rider: 'Manish Gautam',
+        );
+        HorseApi().updateHorseInfo(horse);
+      });
+    });
+
+    // ... rest of your initState code ...
     final horse = HorseInfo(
       name: "Thunderbolt",
-      number: 7,
+      number: _horseNumber,
       rider: 'Manish Gautam',
     );
     HorseApi().updateHorseInfo(horse);
+
     // 
     final status = LiveMatchStatus(isLive: true, message: "Match is now live!");
     LiveMatchApi().updateLiveStatus(status);
@@ -99,6 +118,11 @@ TimeInfo timeInfo = TimeInfo(seconds:0 , display: "00:00:00s");
   //     _platformVersion = platformVersion;
   //   });
   // }
+  @override
+  void dispose() {
+    _horseTimer?.cancel();
+    super.dispose();
+  }
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
