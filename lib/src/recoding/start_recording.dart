@@ -36,7 +36,7 @@ class _StartRecordingState extends State<StartRecording> {
 
     // Start the timer to increment horse number every second
     _horseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      // setState(() {
+      setState(() {
         _horseNumber++;
         final horse = HorseInfo(
           name: "Thunderbolt",
@@ -44,7 +44,7 @@ class _StartRecordingState extends State<StartRecording> {
           rider: 'Manish Gautam',
         );
         HorseApi().updateHorseInfo(horse);
-      // });
+      });
     });
 
     // ... rest of your initState code ...
@@ -69,7 +69,7 @@ TimeInfo timeInfo = TimeInfo(seconds:0 , display: "00:00:00s");
      
     TimeApi().updateTime(timeInfo);
     //
-    RankInfo rankInfo = RankInfo(position: 1,label: "Gold Medalist",);
+    RankInfo rankInfo = RankInfo(position: 1,label: "win By: 0.34s",);
 
       
     RankApi().updateRank(rankInfo);
