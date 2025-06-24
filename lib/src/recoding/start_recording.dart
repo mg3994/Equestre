@@ -12,7 +12,6 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 // import 'package:texture_camera/texture_camera.dart';
 
-
 class StartRecording extends StatefulWidget {
   const StartRecording({super.key, this.eventId});
   final String? eventId;
@@ -31,7 +30,41 @@ class _StartRecordingState extends State<StartRecording> {
   @override
   void initState() {
     super.initState();
-  //  initPlatformState();
+    final horse = HorseInfo(
+      name: "Thunderbolt",
+      number: 7,
+      rider: 'Manish Gautam',
+    );
+    HorseApi().updateHorseInfo(horse);
+    // 
+    final status = LiveMatchStatus(isLive: true, message: "Match is now live!");
+    LiveMatchApi().updateLiveStatus(status);
+    // 
+    PenaltyInfo penaltyInfo = PenaltyInfo(
+      description: "Foul play detected",
+      value: 5,
+    );
+    PenaltyApi().updatePenalty(penaltyInfo);
+// 
+TimeInfo timeInfo = TimeInfo(seconds:0 , display: "00:00:00s");
+     
+    TimeApi().updateTime(timeInfo);
+    //
+    RankInfo rankInfo = RankInfo(position: 1,label: "Gold Medalist",);
+
+      
+    RankApi().updateRank(rankInfo);
+    //
+    GapToBestInfo gapToBestInfo = GapToBestInfo(
+     gapSeconds: -1.23,
+      display: "-1.23s",
+      isFaster: false,
+    );
+    GapToBestApi().updateGapToBest(gapToBestInfo);
+    //
+    
+    //  initPlatformState();
+
     CamerawesomePlugin.getSensors().then((value) {
       setState(() {
         sensorDeviceData = value;
@@ -45,7 +78,7 @@ class _StartRecordingState extends State<StartRecording> {
       });
     });
   }
-// Platform messages are asynchronous, so we initialize in an async method.
+  // Platform messages are asynchronous, so we initialize in an async method.
   // Future<void> initPlatformState() async {
   //   String platformVersion;
   //   // Platform messages may fail, so we use a try/catch PlatformException.
@@ -72,22 +105,26 @@ class _StartRecordingState extends State<StartRecording> {
     return Scaffold(
       body: Container(
         color: Colors.white,
-        child: 
-        // Center(
-        //   child: Text(
-        //    'Running on: $_platformVersion\n',
-        //     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        //   ),
-        // ),
-         sensorDeviceData != null && isMultiCamSupported != null
+        child:
+            // Center(
+            //   child: Text(
+            //    'Running on: $_platformVersion\n',
+            //     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            //   ),
+            // ),
+            sensorDeviceData != null && isMultiCamSupported != null
             ? CameraAwesomeBuilder.awesome(
-                   saveConfig: SaveConfig.video(
+                saveConfig: SaveConfig.video(
                   pathBuilder: (sensors) async {
                     Directory? downloadsDir;
                     if (Platform.isAndroid) {
-                      downloadsDir = await getDownloadsDirectory() ;
+                      downloadsDir = await getDownloadsDirectory();
                       downloadsDir = await Directory(
-                       p.join(downloadsDir?.path ??Directory('/storage/emulated/0/Download/').path, 'Equestre')
+                        p.join(
+                          downloadsDir?.path ??
+                              Directory('/storage/emulated/0/Download/').path,
+                          'Equestre',
+                        ),
                       ).create(recursive: true);
                     } else if (Platform.isIOS) {
                       downloadsDir = await getApplicationDocumentsDirectory();
@@ -96,7 +133,9 @@ class _StartRecordingState extends State<StartRecording> {
                       ).create(recursive: true);
                     }
                     if (downloadsDir == null) {
-                      throw Exception('Could not determine downloads directory');
+                      throw Exception(
+                        'Could not determine downloads directory',
+                      );
                     }
                     if (sensors.length > 1) {
                       return MultipleCaptureRequest({
@@ -118,7 +157,7 @@ class _StartRecordingState extends State<StartRecording> {
                   },
                   videoOptions: VideoOptions(enableAudio: true),
                 ),
-            
+
                 sensorConfig: SensorConfig.single(
                   flashMode: FlashMode.auto,
                   aspectRatio: CameraAspectRatios.ratio_16_9,
@@ -221,49 +260,64 @@ enum PipShape {
   Path getPath(Offset center, double width, double height) {
     switch (this) {
       case PipShape.square:
-        return Path()
-          ..addRect(Rect.fromCenter(
+        return Path()..addRect(
+          Rect.fromCenter(
             center: center,
             width: min(width, height),
             height: min(width, height),
-          ));
+          ),
+        );
       case PipShape.circle:
-        return Path()
-          ..addOval(Rect.fromCenter(
+        return Path()..addOval(
+          Rect.fromCenter(
             center: center,
             width: min(width, height),
             height: min(width, height),
-          ));
+          ),
+        );
       case PipShape.triangle:
         return Path()
           ..moveTo(center.dx, center.dy - min(width, height) / 2)
-          ..lineTo(center.dx + min(width, height) / 2,
-              center.dy + min(width, height) / 2)
-          ..lineTo(center.dx - min(width, height) / 2,
-              center.dy + min(width, height) / 2)
+          ..lineTo(
+            center.dx + min(width, height) / 2,
+            center.dy + min(width, height) / 2,
+          )
+          ..lineTo(
+            center.dx - min(width, height) / 2,
+            center.dy + min(width, height) / 2,
+          )
           ..close();
       case PipShape.roundedSquare:
-        return Path()
-          ..addRRect(RRect.fromRectAndRadius(
+        return Path()..addRRect(
+          RRect.fromRectAndRadius(
             Rect.fromCenter(
               center: center,
               width: min(width, height),
               height: min(width, height),
             ),
             const Radius.circular(20.0),
-          ));
+          ),
+        );
       case PipShape.hexagon:
         return Path()
           ..moveTo(center.dx, center.dy - min(width, height) / 2)
-          ..lineTo(center.dx + min(width, height) / 2,
-              center.dy - min(width, height) / 4)
-          ..lineTo(center.dx + min(width, height) / 2,
-              center.dy + min(width, height) / 4)
+          ..lineTo(
+            center.dx + min(width, height) / 2,
+            center.dy - min(width, height) / 4,
+          )
+          ..lineTo(
+            center.dx + min(width, height) / 2,
+            center.dy + min(width, height) / 4,
+          )
           ..lineTo(center.dx, center.dy + min(width, height) / 2)
-          ..lineTo(center.dx - min(width, height) / 2,
-              center.dy + min(width, height) / 4)
-          ..lineTo(center.dx - min(width, height) / 2,
-              center.dy - min(width, height) / 4)
+          ..lineTo(
+            center.dx - min(width, height) / 2,
+            center.dy + min(width, height) / 4,
+          )
+          ..lineTo(
+            center.dx - min(width, height) / 2,
+            center.dy - min(width, height) / 4,
+          )
           ..close();
     }
   }
@@ -282,11 +336,7 @@ class _MyCustomPipClipper extends CustomClipper<Path> {
 
   @override
   Path getClip(Size size) {
-    return shape.getPath(
-      size.center(Offset.zero),
-      width,
-      height,
-    );
+    return shape.getPath(size.center(Offset.zero), width, height);
   }
 
   @override
