@@ -874,7 +874,7 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware,HorseApi, L
 
     cameraState.apply {
         horseInfo = horse
-
+       // updateLifecycle(activity!!)
     }
     }
 
@@ -882,7 +882,7 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware,HorseApi, L
 
         cameraState.apply {
             liveMatchStatus = status
-
+          //  updateLifecycle(activity!!)
         }
     }
 
@@ -890,6 +890,7 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware,HorseApi, L
 
         cameraState.apply {
             penaltyInfo = penalty
+            // updateLifecycle(activity!!)
         }
     }
 
@@ -897,6 +898,7 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware,HorseApi, L
 
         cameraState.apply {
             timeInfo = time
+           // updateLifecycle(activity!!)
         }
     }
 
@@ -904,14 +906,15 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware,HorseApi, L
 
         cameraState.apply {
             rankInfo = rank
+            // updateLifecycle(activity!!)
         }
     }
 
     override fun updateGapToBest(gap: GapToBestInfo) {
 
         cameraState.apply {
-        gapToBestInfo = gap
-
+            gapToBestInfo = gap
+           // updateLifecycle(activity!!)
         }
     }
     //////////
