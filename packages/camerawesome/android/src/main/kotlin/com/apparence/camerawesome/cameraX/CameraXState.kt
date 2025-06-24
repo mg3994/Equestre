@@ -59,7 +59,7 @@ data class CameraXState(
     var mirrorFrontCamera: Boolean = false,
     val videoRecordingQuality: VideoRecordingQuality?,
     val videoOptions: AndroidVideoOptions?,
-    @OptIn(UnstableApi::class)
+
 
 ) : EventChannel.StreamHandler, SensorOrientation {
 
@@ -184,7 +184,7 @@ data class CameraXState(
                     }
 
                     overlayEffect?.let {
-                        media3Effect.setEffects(listOf(it))
+                        media3Effect.setEffects(listOf(overlayEffect))
                     }
 
                     useCaseGroupBuilder.addEffect(media3Effect)
@@ -274,7 +274,7 @@ data class CameraXState(
             }
 
             overlayEffect?.let {
-                media3Effect.setEffects(listOf(it))
+                media3Effect.setEffects(listOf(overlayEffect))
             }
 
             useCaseGroupBuilder.addEffect(media3Effect)
