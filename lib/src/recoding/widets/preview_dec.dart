@@ -1,106 +1,98 @@
-import 'package:camerawesome/camerawesome_plugin.dart';
-import 'package:flutter/material.dart';
+// import 'package:camerawesome/camerawesome_plugin.dart';
+// import 'package:flutter/material.dart';
 
-class PreviewDecor extends StatefulWidget {
-  const PreviewDecor({super.key, this.rotateWithDevice = true,});
-  final bool rotateWithDevice;
+// class WidgetCameraOrient extends StatefulWidget {
+//   const WidgetCameraOrient({
+//     super.key,
+//     required this.builder,
+//     this.rotateWithDevice = true,
+//   });
 
-  @override
-  State<PreviewDecor> createState() => _PreviewDecorState();
-}
+//   /// Builder that receives the current orientation and turns
+//   final Widget Function(CameraOrientations orientation, double turns) builder;
+//   final bool rotateWithDevice;
 
-class _PreviewDecorState extends State<PreviewDecor> {
-   CameraOrientations previousOrientation = CameraOrientations.portrait_up;
-  double turns = 0;
-  @override
-  Widget build(BuildContext context) {
-    if (widget.rotateWithDevice) {
-      return StreamBuilder<CameraOrientations>(
-        stream: CamerawesomePlugin.getNativeOrientation(),
-        builder: (_, orientationSnapshot) {
-          final orientation = orientationSnapshot.data;
-          if (orientation != null && orientation != previousOrientation) {
-            turns = shortestTurnsToReachTarget(
-              current: turns,
-              target: getTurns(orientation),
-            );
-            previousOrientation = orientation;
-          }
+//   @override
+//   State<WidgetCameraOrient> createState() => _WidgetCameraOrientState();
+// }
 
-          return AnimatedRotation(
-            turns: turns,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeInOut,
-            child: Stack(
-               fit: StackFit.expand,
-              children: [
-                Align(
-             alignment: Alignment.bottomCenter,
-             child: Text("Hello"),
-          )
-            
-            ],),
-          );
-        },
-      );
-    } else {
-      return Stack(
-         fit: StackFit.expand,
-        children: [
-          Align(
-             alignment: Alignment.bottomCenter,
-             child: Text("Hello"),
-          )
-             
-            ],);
-    }
-  }
+// class _WidgetCameraOrientState extends State<WidgetCameraOrient> {
+//   CameraOrientations currentOrientation = CameraOrientations.portrait_up;
+//   double turns = 0;
 
-  
+//   @override
+//   void initState() {
+//     super.initState();
+//     _fetchInitialOrientation();
+//   }
 
-  double getTurns(CameraOrientations orientation) {
-    switch (orientation) {
-      case CameraOrientations.landscape_left:
-        return 0.75;
-      case CameraOrientations.landscape_right:
-        return 0.25;
-      case CameraOrientations.portrait_up:
-        return 0;
-      case CameraOrientations.portrait_down:
-        return 0.5;
-    }
-  }
+//   Future<void> _fetchInitialOrientation() async {
+//     final stream = CamerawesomePlugin.getNativeOrientation();
+//     if (stream == null) return;
+//     await for (final orientation in stream) {
+//       setState(() {
+//         currentOrientation = orientation;
+//         turns = getTurns(orientation);
+//       });
+//       break;
+//     }
+//   }
 
-  /// Determines which next turn value should be used to have the least rotation
-  /// movements between [current] and [target]
-  ///
-  /// E.g: when being at 0.5 turns, should I go to 0.75 or to -0.25 to minimize
-  /// the rotation ?
-  double shortestTurnsToReachTarget(
-      {required double current, required double target}) {
-    final currentDegree = current * 360;
-    final targetDegree = target * 360;
+//   @override
+//   Widget build(BuildContext context) {
+//     if (!widget.rotateWithDevice) {
+//       return widget.builder(currentOrientation, 0);
+//     }
 
-    // Determine if we need to go clockwise or counterclockwise to reach
-    // the next angle with the least movements
-    // See https://math.stackexchange.com/a/2898118
-    final clockWise = (targetDegree - currentDegree + 540) % 360 - 180 > 0;
-    double resultDegree = currentDegree;
-    do {
-      resultDegree += (clockWise ? 1 : -1) * 360 / 4;
-    } while (resultDegree % 360 != targetDegree % 360);
+//     return StreamBuilder<CameraOrientations>(
+//       stream: CamerawesomePlugin.getNativeOrientation(),
+//       initialData: currentOrientation,
+//       builder: (context, snapshot) {
+//         final orientation = snapshot.data;
+//         if (orientation != null && orientation != currentOrientation) {
+//           turns = shortestTurnsToReachTarget(
+//             current: turns,
+//             target: getTurns(orientation),
+//           );
+//           currentOrientation = orientation;
+//         }
 
-    // Revert back to turns
-    return resultDegree / 360;
-  }
-}  /// Determines which next turn value should be used to have the least rotation
-  /// movements between [current] and [target]
-  ///
-  /// E.g: when being at 0.5 turns, should I go to 0.75 or to -0.25 to minimize
-  /// the rotation ?
+//         return AnimatedRotation(
+//           turns: turns,
+//           duration: const Duration(milliseconds: 200),
+//           curve: Curves.easeInOut,
+//           child: widget.builder(currentOrientation, turns),
+//         );
+//       },
+//     );
+//   }
 
-    // Determine if we need to go clockwise or counterclockwise to reach
-    // the next angle with the least movements
-    // See https://math.stackexchange.com/a/2898118
+//   double getTurns(CameraOrientations orientation) {
+//     switch (orientation) {
+//       case CameraOrientations.landscape_left:
+//         return 0.75;
+//       case CameraOrientations.landscape_right:
+//         return 0.25;
+//       case CameraOrientations.portrait_up:
+//         return 0;
+//       case CameraOrientations.portrait_down:
+//         return 0.5;
+//     }
+//   }
 
-    // Revert back to turns
+//   double shortestTurnsToReachTarget({
+//     required double current,
+//     required double target,
+//   }) {
+//     final currentDegree = current * 360;
+//     final targetDegree = target * 360;
+//     final clockwise = (targetDegree - currentDegree + 540) % 360 - 180 > 0;
+
+//     double resultDegree = currentDegree;
+//     do {
+//       resultDegree += clockwise ? 90 : -90;
+//     } while (resultDegree % 360 != targetDegree % 360);
+
+//     return resultDegree / 360;
+//   }
+// }

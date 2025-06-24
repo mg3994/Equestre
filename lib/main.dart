@@ -1,6 +1,7 @@
 import 'package:equestre/src/main/main_page.dart' show MainPage;
 import 'package:equestre/src/recoding/manage.dart' show ManageRecordings;
-import 'package:equestre/src/recoding/start.dart' show StartRecording;
+import 'package:equestre/src/recoding/start_recording.dart' show StartRecording;
+// import 'package:equestre/src/recoding/start.dart' show StartRecording;
 import 'package:equestre/src/settings/settings.dart' show Settings;
 import 'package:equestre/src/sports/sports_events.dart' show SportsEvents;
 import 'package:flutter/material.dart';
@@ -44,7 +45,7 @@ class MyApp extends StatelessWidget {
     routes: {
       '/': (context) => MainPage(),
       '/sports-events': (context) => SportsEvents(),
-      '/manage-recordings': (context) => ManageRecordings(),
+      '/gallery': (context) => ManageRecordings(),
       '/settings': (context) => Settings(),
     },
     onGenerateRoute: (settings) {

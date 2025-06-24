@@ -34,7 +34,7 @@ class _MainPageState extends State<MainPage> {
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.pushNamed(context, '/manage-recordings');
+                Navigator.pushNamed(context, '/gallery');
               },
               child: const Text('Manage Recordings'),
             ),
