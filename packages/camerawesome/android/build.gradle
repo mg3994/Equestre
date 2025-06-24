@@ -97,12 +97,12 @@ def compatibleVersion(prop, fallbackVersion, min = null, max = null) {
 }
 
 android {
-    compileSdkVersion 36
+    compileSdkVersion 35
     namespace 'io.apparence.camerawesome'
 
     defaultConfig {
         minSdkVersion 24
-        targetSdk = 36
+        targetSdk = 35
     }
     lintOptions {
         disable 'InvalidPackage'
@@ -111,8 +111,8 @@ android {
         unitTests.returnDefaultValues = true
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
 
     kotlinOptions {
