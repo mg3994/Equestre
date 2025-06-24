@@ -67,13 +67,7 @@ import io.flutter.plugin.common.BinaryMessenger
 enum class CaptureModes {
     PHOTO, VIDEO, PREVIEW, ANALYSIS_ONLY,
 }
-// Latest state, volatile for thread-safety
-var horseInfo: HorseInfo? = null
-var liveMatchStatus: LiveMatchStatus? = null
-var penaltyInfo: PenaltyInfo? = null
-var timeInfo: TimeInfo? = null
-var rankInfo: RankInfo? = null
-var gapToBestInfo: GapToBestInfo? = null
+
 @UnstableApi
 class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware,HorseApi, LiveMatchApi, PenaltyApi, TimeApi, RankApi, GapToBestApi {
     private lateinit var physicalButtonHandler: PhysicalButtonsHandler
@@ -119,100 +113,7 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware,HorseApi, L
 
 
 
-    companion object {
-        @JvmStatic
-        @OptIn(UnstableApi::class)
-        fun buildColoredTextOverlay(
-            text: String,
-            bgColor: Int,
-            fgColor: Int = Color.WHITE,
-            xAnchor: Float,
-            yAnchor: Float,
-            textSizePx: Int = 48,
-            rotationDegrees: Float = 0f,
-            backgroundAnchorX: Float? = null,
-            backgroundAnchorY: Float? = null
-        ): TextOverlay {
-            return object : TextOverlay() {
-                override fun getText(presentationTimeUs: Long): SpannableString {
-                    val spannable = SpannableString(text)
-                    spannable.setSpan(BackgroundColorSpan(bgColor), 0, text.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
-                    spannable.setSpan(ForegroundColorSpan(fgColor), 0, text.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
-                    spannable.setSpan(AbsoluteSizeSpan(textSizePx, false), 0, text.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
-                    return spannable
-                }
-                override fun getOverlaySettings(presentationTimeUs: Long): StaticOverlaySettings {
-                    val builder = StaticOverlaySettings.Builder()
-                        .setOverlayFrameAnchor(xAnchor, yAnchor)
-                        .setRotationDegrees(rotationDegrees)
-                    if (backgroundAnchorX != null && backgroundAnchorY != null) {
-                        builder.setBackgroundFrameAnchor(backgroundAnchorX, backgroundAnchorY)
-                    }
-                    return builder.build()
-                }
-            }
-        }
 
-      fun createDynamicOverlayEffect(): OverlayEffect? {
-
-        val overlays = mutableListOf<TextureOverlay>()
-
-        fun isVisible(text: String?) = !text.isNullOrEmpty()
-
-        // Watermark (always visible)
-        overlays.add(buildColoredTextOverlay(
-            "© Equestre™",
-            Color.TRANSPARENT,
-            Color.LTGRAY,
-            -0.95f, -0.95f,
-            70,
-            backgroundAnchorX = -0.9f,
-            backgroundAnchorY = 0.6f
-        ) as TextureOverlay)
-
-        liveMatchStatus?.let { status ->
-            if (status.isLive && isVisible(status.message)) {
-                overlays.add(buildColoredTextOverlay(
-                    status.message!!,
-                    Color.RED,
-                    Color.WHITE,
-                    0.95f, -0.95f,
-                    60,
-                    backgroundAnchorX = 0.9f,
-                    backgroundAnchorY = 0.6f
-                ) as TextureOverlay)
-            }
-        }
-
-        horseInfo?.let { horse ->
-            if (horse.number > 0)
-                overlays.add(buildColoredTextOverlay("#${horse.number}", 0xFF1E88E5.toInt(), xAnchor = -0.95f, yAnchor = 0.65f, textSizePx = 80, backgroundAnchorX = -0.9f, backgroundAnchorY = -0.45f) as TextureOverlay)
-            if (isVisible(horse.name))
-                overlays.add(buildColoredTextOverlay(horse.name, 0xFF808080.toInt(), xAnchor = -0.95f, yAnchor = 0.75f, textSizePx = 80, backgroundAnchorX = -0.77f, backgroundAnchorY = -0.45f) as TextureOverlay)
-            if (isVisible(horse.rider))
-                overlays.add(buildColoredTextOverlay("Rider: ${horse.rider}", 0xFF6A1B9A.toInt(), xAnchor = -0.95f, yAnchor = 0.85f, textSizePx = 80, backgroundAnchorX = -0.74f, backgroundAnchorY = -0.52f) as TextureOverlay)
-        }
-
-        gapToBestInfo?.display?.let {
-            overlays.add(buildColoredTextOverlay(it, 0xFF2E7D32.toInt(), xAnchor = 0.95f, yAnchor = 0.60f, textSizePx = 70, backgroundAnchorX = 0.77f, backgroundAnchorY = -0.45f) as TextureOverlay)
-        }
-
-        penaltyInfo?.let { penalty ->
-            val penaltyText = "${penalty.description}: ${penalty.value}"
-            overlays.add(buildColoredTextOverlay(penaltyText, 0xFFC62828.toInt(), xAnchor = 0.95f, yAnchor = 0.70f, textSizePx = 70, backgroundAnchorX = 0.58f, backgroundAnchorY = -0.52f) as TextureOverlay)
-        }
-
-        timeInfo?.display?.let {
-            overlays.add(buildColoredTextOverlay(it, 0xFF455A64.toInt(), xAnchor = 0.95f, yAnchor = 0.80f, textSizePx = 70, backgroundAnchorX = 0.77f, backgroundAnchorY = -0.52f) as TextureOverlay)
-        }
-
-        rankInfo?.label?.let {
-            overlays.add(buildColoredTextOverlay(it, 0xFF00838F.toInt(), xAnchor = 0.95f, yAnchor = 0.90f, textSizePx = 70, backgroundAnchorX = 0.9f, backgroundAnchorY = -0.52f) as TextureOverlay)
-        }
-            return  OverlayEffect(ImmutableList.copyOf(overlays))
-
-
-    } }
 
     // Your existing cameraState and other members here...
     @SuppressLint("UnsafeOptInUsageError")
@@ -970,43 +871,49 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware,HorseApi, L
     }
 ///////
     override fun updateHorseInfo(horse: HorseInfo) {
-    horseInfo = horse
+
     cameraState.apply {
+        horseInfo = horse
         updateLifecycle(activity!!)
     }
     }
 
     override fun updateLiveStatus(status: LiveMatchStatus) {
-        liveMatchStatus = status
+
         cameraState.apply {
+            liveMatchStatus = status
             updateLifecycle(activity!!)
         }
     }
 
     override fun updatePenalty(penalty: PenaltyInfo) {
-        penaltyInfo = penalty
+
         cameraState.apply {
+            penaltyInfo = penalty
             updateLifecycle(activity!!)
         }
     }
 
     override fun updateTime(time: TimeInfo) {
-        timeInfo = time
+
         cameraState.apply {
+            timeInfo = time
             updateLifecycle(activity!!)
         }
     }
 
     override fun updateRank(rank: RankInfo) {
-        rankInfo = rank
+
         cameraState.apply {
+            rankInfo = rank
             updateLifecycle(activity!!)
         }
     }
 
     override fun updateGapToBest(gap: GapToBestInfo) {
-        gapToBestInfo = gap
+
         cameraState.apply {
+            gapToBestInfo = gap
             updateLifecycle(activity!!)
         }
     }
