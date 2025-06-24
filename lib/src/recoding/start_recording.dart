@@ -36,7 +36,7 @@ class _StartRecordingState extends State<StartRecording> {
 
     // Start the timer to increment horse number every second
     _horseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
+      // setState(() {
         _horseNumber++;
         final horse = HorseInfo(
           name: "Thunderbolt",
@@ -44,7 +44,7 @@ class _StartRecordingState extends State<StartRecording> {
           rider: 'Manish Gautam',
         );
         HorseApi().updateHorseInfo(horse);
-      });
+      // });
     });
 
     // ... rest of your initState code ...

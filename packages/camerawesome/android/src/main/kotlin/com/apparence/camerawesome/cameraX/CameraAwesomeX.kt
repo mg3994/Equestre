@@ -971,44 +971,44 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware,HorseApi, L
 ///////
     override fun updateHorseInfo(horse: HorseInfo) {
     horseInfo = horse
-    cameraState.apply {
-        updateLifecycle(activity!!)
-    }
+//    cameraState.apply {
+//        updateLifecycle(activity!!)
+//    }
     }
 
     override fun updateLiveStatus(status: LiveMatchStatus) {
         liveMatchStatus = status
-        cameraState.apply {
-            updateLifecycle(activity!!)
-        }
+//        cameraState.apply {
+//            updateLifecycle(activity!!)
+//        }
     }
 
     override fun updatePenalty(penalty: PenaltyInfo) {
         penaltyInfo = penalty
-        cameraState.apply {
-            updateLifecycle(activity!!)
-        }
+//        cameraState.apply {
+//            updateLifecycle(activity!!)
+//        }
     }
 
     override fun updateTime(time: TimeInfo) {
         timeInfo = time
-        cameraState.apply {
-            updateLifecycle(activity!!)
-        }
+//        cameraState.apply {
+//            updateLifecycle(activity!!)
+//        }
     }
 
     override fun updateRank(rank: RankInfo) {
         rankInfo = rank
-        cameraState.apply {
-            updateLifecycle(activity!!)
-        }
+//        cameraState.apply {
+//            updateLifecycle(activity!!)
+//        }
     }
 
     override fun updateGapToBest(gap: GapToBestInfo) {
         gapToBestInfo = gap
-        cameraState.apply {
-            updateLifecycle(activity!!)
-        }
+//        cameraState.apply {
+//            updateLifecycle(activity!!)
+//        }
     }
     //////////
 
