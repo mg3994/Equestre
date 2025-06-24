@@ -151,7 +151,7 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware,HorseApi, L
         }
     }
 
-    private fun updateOverlay() {
+     fun createDynamicOverlayEffect(): OverlayEffect? {
         val overlays = mutableListOf<TextureOverlay>()
 
         fun isVisible(text: String?) = !text.isNullOrEmpty()
@@ -209,8 +209,7 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware,HorseApi, L
 
         currentOverlayEffect = OverlayEffect(ImmutableList.copyOf(overlays))
 
-        // Apply overlay effect to camera pipeline:
-        cameraState.applyEffect(currentOverlayEffect)
+       return currentOverlayEffect
     }
 
     // Your existing cameraState and other members here...
@@ -970,37 +969,35 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware,HorseApi, L
 ///////
     override fun updateHorseInfo(horse: HorseInfo) {
     horseInfo = horse
-    updateOverlay()
+    createDynamicOverlayEffect()
     }
 
     override fun updateLiveStatus(status: LiveMatchStatus) {
         liveMatchStatus = status
-        updateOverlay()
+        createDynamicOverlayEffect()
     }
 
     override fun updatePenalty(penalty: PenaltyInfo) {
         penaltyInfo = penalty
-        updateOverlay()
+        createDynamicOverlayEffect()
     }
 
     override fun updateTime(time: TimeInfo) {
         timeInfo = time
-        updateOverlay()
+        createDynamicOverlayEffect()
     }
 
     override fun updateRank(rank: RankInfo) {
         rankInfo = rank
-        updateOverlay()
+        createDynamicOverlayEffect()
     }
 
     override fun updateGapToBest(gap: GapToBestInfo) {
         gapToBestInfo = gap
-        updateOverlay()
+        createDynamicOverlayEffect()
     }
     //////////
 
-    private fun CameraXState.applyEffect(overlayEffect: OverlayEffect?) {
 
-    }
 
 }

@@ -2,11 +2,14 @@ package com.apparence.camerawesome.cameraX
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
 import android.util.Log
 import android.util.Rational
 import android.util.Size
 import android.view.Surface
+import android.widget.Toast
+import androidx.annotation.OptIn
 import androidx.camera.camera2.internal.compat.CameraCharacteristicsCompat
 import androidx.camera.camera2.internal.compat.quirk.CamcorderProfileResolutionQuirk
 import androidx.camera.camera2.interop.Camera2CameraInfo
@@ -15,9 +18,11 @@ import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.media3.effect.Media3Effect
 import androidx.camera.video.*
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import androidx.media3.common.util.UnstableApi
 import com.apparence.camerawesome.CamerawesomePlugin
 import com.apparence.camerawesome.models.FlashMode
 import com.apparence.camerawesome.sensors.SensorOrientation
@@ -25,6 +30,8 @@ import com.apparence.camerawesome.utils.isMultiCamSupported
 import io.flutter.plugin.common.EventChannel
 import io.flutter.view.TextureRegistry
 import java.util.concurrent.Executor
+//
+import androidx.media3.effect.OverlayEffect
 
 /// Hold the settings of the camera and use cases in this class and
 /// call updateLifecycle() to refresh the state
@@ -52,6 +59,8 @@ data class CameraXState(
     var mirrorFrontCamera: Boolean = false,
     val videoRecordingQuality: VideoRecordingQuality?,
     val videoOptions: AndroidVideoOptions?,
+    @OptIn(UnstableApi::class)
+
 ) : EventChannel.StreamHandler, SensorOrientation {
 
     var imageAnalysisBuilder: ImageAnalysisBuilder? = null
@@ -95,6 +104,7 @@ data class CameraXState(
         imageCaptures.clear()
         videoCaptures.clear()
         val resolutionSelector = getResolutionSelector(aspectRatio ?: AspectRatio.RATIO_4_3)
+        val overlayEffect = CameraAwesomeX().createDynamicOverlayEffect()
         if (cameraProvider.isMultiCamSupported() && sensors.size > 1) {
             val singleCameraConfigs = mutableListOf<ConcurrentCamera.SingleCameraConfig>()
             var isFirst = true
@@ -159,10 +169,26 @@ data class CameraXState(
                         }.build()
                     useCaseGroupBuilder.addUseCase(imageCapture)
                     imageCaptures.add(imageCapture)
-                } else {
+                } else { //TODO
                     val videoCapture = buildVideoCapture(videoOptions)
                     useCaseGroupBuilder.addUseCase(videoCapture)
                     videoCaptures[sensor] = videoCapture
+                    //
+                    val media3Effect = Media3Effect(
+                        activity,
+                        CameraEffect.PREVIEW or CameraEffect.VIDEO_CAPTURE,
+                        ContextCompat.getMainExecutor(activity)
+                    ) {
+                        Log.e(CamerawesomePlugin.TAG, "Media3Effect error: ${it.message ?: "Unknown error"}")
+                        Toast.makeText(activity, "Effect error: ${it.message ?: "Unknown error"}", Toast.LENGTH_LONG).show()
+                    }
+
+                    overlayEffect?.let {
+                        media3Effect.setEffects(listOf(it))
+                    }
+
+                    useCaseGroupBuilder.addEffect(media3Effect)
+                    //
                 }
                 if (isFirst && enableImageStream && imageAnalysisBuilder != null) {
                     imageAnalysis = imageAnalysisBuilder!!.build()
@@ -237,7 +263,22 @@ data class CameraXState(
                 videoCaptures[sensors.first()] = videoCapture
             }
 
+            //
+            val media3Effect = Media3Effect(
+                activity,
+                CameraEffect.PREVIEW or CameraEffect.VIDEO_CAPTURE,
+                ContextCompat.getMainExecutor(activity)
+            ) {
+                Log.e(CamerawesomePlugin.TAG, "Media3Effect error: ${it.message ?: "Unknown error"}")
+                Toast.makeText(activity, "Effect error: ${it.message ?: "Unknown error"}", Toast.LENGTH_LONG).show()
+            }
 
+            overlayEffect?.let {
+                media3Effect.setEffects(listOf(it))
+            }
+
+            useCaseGroupBuilder.addEffect(media3Effect)
+            //
             val addAnalysisUseCase = enableImageStream && imageAnalysisBuilder != null
             val cameraLevel = CameraCapabilities.getCameraLevel(
                 cameraSelector, cameraProvider
@@ -465,4 +506,8 @@ data class CameraXState(
             else -> Rational(3, 4)
         }
     }
+
+
+
+
 }
