@@ -67,7 +67,13 @@ import io.flutter.plugin.common.BinaryMessenger
 enum class CaptureModes {
     PHOTO, VIDEO, PREVIEW, ANALYSIS_ONLY,
 }
-
+// Latest state, volatile for thread-safety
+var horseInfo: HorseInfo? = null
+var liveMatchStatus: LiveMatchStatus? = null
+var penaltyInfo: PenaltyInfo? = null
+var timeInfo: TimeInfo? = null
+var rankInfo: RankInfo? = null
+var gapToBestInfo: GapToBestInfo? = null
 @UnstableApi
 class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware,HorseApi, LiveMatchApi, PenaltyApi, TimeApi, RankApi, GapToBestApi {
     private lateinit var physicalButtonHandler: PhysicalButtonsHandler
@@ -110,48 +116,45 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware,HorseApi, L
         1.0,
         0.0
     )
-    // Latest state, volatile for thread-safety
-    @Volatile private var horseInfo: HorseInfo? = null
-    @Volatile private var liveMatchStatus: LiveMatchStatus? = null
-    @Volatile private var penaltyInfo: PenaltyInfo? = null
-    @Volatile private var timeInfo: TimeInfo? = null
-    @Volatile private var rankInfo: RankInfo? = null
-    @Volatile private var gapToBestInfo: GapToBestInfo? = null
-    private var currentOverlayEffect: OverlayEffect? = null
 
-    @OptIn(UnstableApi::class)
-    private fun buildColoredTextOverlay(
-        text: String,
-        bgColor: Int,
-        fgColor: Int = Color.WHITE,
-        xAnchor: Float,
-        yAnchor: Float,
-        textSizePx: Int = 48,
-        rotationDegrees: Float = 0f,
-        backgroundAnchorX: Float? = null,
-        backgroundAnchorY: Float? = null
-    ): TextOverlay {
-        return object : TextOverlay() {
-            override fun getText(presentationTimeUs: Long): SpannableString {
-                val spannable = SpannableString(text)
-                spannable.setSpan(BackgroundColorSpan(bgColor), 0, text.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
-                spannable.setSpan(ForegroundColorSpan(fgColor), 0, text.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
-                spannable.setSpan(AbsoluteSizeSpan(textSizePx, false), 0, text.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
-                return spannable
-            }
-            override fun getOverlaySettings(presentationTimeUs: Long): StaticOverlaySettings {
-                val builder = StaticOverlaySettings.Builder()
-                    .setOverlayFrameAnchor(xAnchor, yAnchor)
-                    .setRotationDegrees(rotationDegrees)
-                if (backgroundAnchorX != null && backgroundAnchorY != null) {
-                    builder.setBackgroundFrameAnchor(backgroundAnchorX, backgroundAnchorY)
+
+
+    companion object {
+        @JvmStatic
+        @OptIn(UnstableApi::class)
+        fun buildColoredTextOverlay(
+            text: String,
+            bgColor: Int,
+            fgColor: Int = Color.WHITE,
+            xAnchor: Float,
+            yAnchor: Float,
+            textSizePx: Int = 48,
+            rotationDegrees: Float = 0f,
+            backgroundAnchorX: Float? = null,
+            backgroundAnchorY: Float? = null
+        ): TextOverlay {
+            return object : TextOverlay() {
+                override fun getText(presentationTimeUs: Long): SpannableString {
+                    val spannable = SpannableString(text)
+                    spannable.setSpan(BackgroundColorSpan(bgColor), 0, text.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    spannable.setSpan(ForegroundColorSpan(fgColor), 0, text.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    spannable.setSpan(AbsoluteSizeSpan(textSizePx, false), 0, text.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    return spannable
                 }
-                return builder.build()
+                override fun getOverlaySettings(presentationTimeUs: Long): StaticOverlaySettings {
+                    val builder = StaticOverlaySettings.Builder()
+                        .setOverlayFrameAnchor(xAnchor, yAnchor)
+                        .setRotationDegrees(rotationDegrees)
+                    if (backgroundAnchorX != null && backgroundAnchorY != null) {
+                        builder.setBackgroundFrameAnchor(backgroundAnchorX, backgroundAnchorY)
+                    }
+                    return builder.build()
+                }
             }
         }
-    }
 
-     fun createDynamicOverlayEffect(): OverlayEffect? {
+      fun createDynamicOverlayEffect(): OverlayEffect? {
+
         val overlays = mutableListOf<TextureOverlay>()
 
         fun isVisible(text: String?) = !text.isNullOrEmpty()
@@ -206,11 +209,10 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware,HorseApi, L
         rankInfo?.label?.let {
             overlays.add(buildColoredTextOverlay(it, 0xFF00838F.toInt(), xAnchor = 0.95f, yAnchor = 0.90f, textSizePx = 70, backgroundAnchorX = 0.9f, backgroundAnchorY = -0.52f) as TextureOverlay)
         }
+            return  OverlayEffect(ImmutableList.copyOf(overlays))
 
-        currentOverlayEffect = OverlayEffect(ImmutableList.copyOf(overlays))
 
-       return currentOverlayEffect
-    }
+    } }
 
     // Your existing cameraState and other members here...
     @SuppressLint("UnsafeOptInUsageError")
@@ -969,32 +971,44 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware,HorseApi, L
 ///////
     override fun updateHorseInfo(horse: HorseInfo) {
     horseInfo = horse
-    createDynamicOverlayEffect()
+    cameraState.apply {
+        updateLifecycle(activity!!)
+    }
     }
 
     override fun updateLiveStatus(status: LiveMatchStatus) {
         liveMatchStatus = status
-        createDynamicOverlayEffect()
+        cameraState.apply {
+            updateLifecycle(activity!!)
+        }
     }
 
     override fun updatePenalty(penalty: PenaltyInfo) {
         penaltyInfo = penalty
-        createDynamicOverlayEffect()
+        cameraState.apply {
+            updateLifecycle(activity!!)
+        }
     }
 
     override fun updateTime(time: TimeInfo) {
         timeInfo = time
-        createDynamicOverlayEffect()
+        cameraState.apply {
+            updateLifecycle(activity!!)
+        }
     }
 
     override fun updateRank(rank: RankInfo) {
         rankInfo = rank
-        createDynamicOverlayEffect()
+        cameraState.apply {
+            updateLifecycle(activity!!)
+        }
     }
 
     override fun updateGapToBest(gap: GapToBestInfo) {
         gapToBestInfo = gap
-        createDynamicOverlayEffect()
+        cameraState.apply {
+            updateLifecycle(activity!!)
+        }
     }
     //////////
 

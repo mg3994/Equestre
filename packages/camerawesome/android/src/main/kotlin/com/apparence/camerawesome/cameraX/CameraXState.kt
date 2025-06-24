@@ -104,7 +104,7 @@ data class CameraXState(
         imageCaptures.clear()
         videoCaptures.clear()
         val resolutionSelector = getResolutionSelector(aspectRatio ?: AspectRatio.RATIO_4_3)
-        val overlayEffect = CameraAwesomeX().createDynamicOverlayEffect()
+        val overlayEffect = CameraAwesomeX.createDynamicOverlayEffect()
         if (cameraProvider.isMultiCamSupported() && sensors.size > 1) {
             val singleCameraConfigs = mutableListOf<ConcurrentCamera.SingleCameraConfig>()
             var isFirst = true
