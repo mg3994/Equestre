@@ -5,9 +5,11 @@ import android.os.Handler
 import android.os.Looper
 import android.text.SpannableString
 import android.util.Log
+import android.view.KeyEvent
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.Toast
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraEffect
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
@@ -25,12 +27,12 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.TextOverlay
 import androidx.media3.effect.StaticOverlaySettings
+import androidx.media3.effect.TextureOverlay
 import com.google.common.collect.ImmutableList
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.platform.PlatformView
-import androidx.media3.effect.TextureOverlay
 
 @UnstableApi
 class MyCameraView(
@@ -44,11 +46,14 @@ class MyCameraView(
     private val viewFinder = PreviewView(context)
     private var overlayEffect: OverlayEffect? = null
     private var media3Effect: Media3Effect? = null
+    private var camera: Camera? = null
+    private var currentZoomRatio: Float = 1.0f
 
     init {
         rootView.addView(viewFinder)
         setupCamera()
         setupChannel()
+        setupVolumeButtonZoom()
         startOverlayUpdateListener()
     }
 
@@ -83,7 +88,12 @@ class MyCameraView(
 
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(activity as LifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, useCaseGroup.build())
+                camera = cameraProvider.bindToLifecycle(
+                    activity as LifecycleOwner,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    useCaseGroup.build()
+                )
+                currentZoomRatio = camera?.cameraInfo?.zoomState?.value?.zoomRatio ?: 1.0f
             } catch (e: Exception) {
                 Log.e("MyCameraView", "Camera bind failed", e)
             }
@@ -93,15 +103,24 @@ class MyCameraView(
 
     private fun applyOverlayFromParams() {
         val overlays = mutableListOf<TextOverlay>()
-        creationParams?.forEach { (key, value) ->
-            val text = value?.toString() ?: return@forEach
-            val (x, y) = when (key) {
-                "horseNumber" -> -0.95f to 0.65f
-                "horseName" -> -0.95f to 0.75f
-                "rider" -> -0.95f to 0.85f
-                else -> return@forEach
+        val data = creationParams ?: return
+
+        val entries = listOf(
+            Triple("horseNumber", -0.95f, 0.65f),
+            Triple("horseName", -0.95f, 0.75f),
+            Triple("rider", -0.95f, 0.85f),
+            Triple("penalty", 0.65f, -0.95f),
+            Triple("timeTaken", 0.75f, -0.95f),
+            Triple("rank", 0.85f, -0.95f),
+            Triple("gapToBest", 0.95f, -0.95f),
+            Triple("liveMsg", 0.0f, 0.95f) // centered bottom
+        )
+
+        entries.forEach { (key, x, y) ->
+            val value = data[key]?.toString()
+            if (!value.isNullOrBlank()) {
+                overlays.add(createOverlay(value, x, y))
             }
-            overlays.add(createOverlay(text, x, y))
         }
 
         overlayEffect = OverlayEffect(ImmutableList.copyOf(overlays.map { it as TextureOverlay }))
@@ -146,7 +165,12 @@ class MyCameraView(
             override fun run() {
                 val updatedData = mapOf(
                     "horseName" to "Storm Fury ${System.currentTimeMillis() / 1000}",
-                    "rider" to "Rider: John Doe"
+                    "rider" to "John Doe",
+                    "penalty" to "0.5s",
+                    "timeTaken" to "52.3s",
+                    "rank" to "2nd",
+                    "gapToBest" to "+1.3s",
+                    "liveMsg" to "Match Live"
                 )
                 val newParams = creationParams?.toMutableMap() ?: mutableMapOf()
                 updatedData.forEach { (k, v) -> newParams[k] = v }
@@ -156,6 +180,39 @@ class MyCameraView(
             }
         }
         handler.post(updateRunnable)
+    }
+
+    private fun setupVolumeButtonZoom() {
+        rootView.isFocusableInTouchMode = true
+        rootView.requestFocus()
+        rootView.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            when (keyCode) {
+                KeyEvent.KEYCODE_VOLUME_UP -> {
+                    zoomCamera(true)
+                    true
+                }
+                KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                    zoomCamera(false)
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun zoomCamera(zoomIn: Boolean) {
+        camera?.let {
+            val zoomState = it.cameraInfo.zoomState.value ?: return
+            val zoomStep = 0.1f
+            val newZoom = if (zoomIn)
+                (zoomState.zoomRatio + zoomStep).coerceAtMost(zoomState.maxZoomRatio)
+            else
+                (zoomState.zoomRatio - zoomStep).coerceAtLeast(zoomState.minZoomRatio)
+
+            it.cameraControl.setZoomRatio(newZoom)
+            currentZoomRatio = newZoom
+        }
     }
 
     override fun getView(): View = rootView
