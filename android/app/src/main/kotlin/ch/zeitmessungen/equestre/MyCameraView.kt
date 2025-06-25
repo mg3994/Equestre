@@ -81,7 +81,7 @@ data class OverlayProperties(
 @UnstableApi
 class MyCameraView(
     private val context: Context,
-    messenger: BinaryMessenger,
+    messenger: BinaryMessenger, // This is correctly passed here
     private var creationParams: Map<String?, Any?>?,
     private val activity: FlutterActivity
 ) : PlatformView, DefaultLifecycleObserver {
@@ -272,7 +272,7 @@ class MyCameraView(
 
     override fun getView(): View = rootView
 
-    //region Inner Helper Classes (formerly separate files)
+    //region Helper Classes (formerly separate files)
 
     inner class PermissionHandler(private val activity: FlutterActivity) {
         fun allPermissionsGranted(): Boolean {
@@ -306,7 +306,8 @@ class MyCameraView(
         }
     }
 
-    inner interface ITextOverlayFactory {
+    // Removed 'inner' modifier from interface
+    interface ITextOverlayFactory { // THIS IS THE FIX FOR THE "Modifier 'inner' is not applicable to 'interface'" ERROR
         fun createTextOverlay(props: OverlayProperties): TextOverlay
     }
 
@@ -571,5 +572,5 @@ class MyCameraView(
             }
         }
     }
-    //endregion Inner Helper Classes
+    //endregion Helper Classes
 }
