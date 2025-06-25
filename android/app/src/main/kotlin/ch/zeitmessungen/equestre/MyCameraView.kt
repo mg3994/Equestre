@@ -196,16 +196,9 @@ class MyCameraView(
             }
         }
 
-        val outputOptions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            MediaStoreOutputOptions.Builder(context.contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
-                .setContentValues(contentValues)
-                .build()
-        } else {
-            val file = File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), "EquestreVideos").apply { mkdirs() }
-            MediaStoreOutputOptions.Builder(context.contentResolver, Uri.fromFile(File(file, "$name.mp4")))
-                .setContentValues(contentValues)
-                .build()
-        }
+        val outputFile = File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), "EquestreVideos").apply { mkdirs() }
+        val file = File(outputFile, "$name.mp4")
+        val outputOptions = FileOutputOptions.Builder(file).build()
 
         recording = videoCapture.output
             .prepareRecording(context, outputOptions)
@@ -213,23 +206,21 @@ class MyCameraView(
             .start(ContextCompat.getMainExecutor(context)) { event ->
                 when (event) {
                     is VideoRecordEvent.Start -> {
-                        val uri = event.outputUri
-                        Log.d(TAG, "Recording started: $uri")
-                        methodChannel.invokeMethod("onRecordingStart", uri.toString())
+                        Log.d(TAG, "Recording started")
+                        methodChannel.invokeMethod("onRecordingStart", null)
                     }
                     is VideoRecordEvent.Finalize -> {
-                        val uri = event.outputUri
-                        if (event.error != VideoRecordEvent.Finalize.ERROR_NONE) {
+                        if (event.hasError()) {
                             val err = "Recording error: ${event.error}"
                             Log.e(TAG, err)
                             Toast.makeText(context, err, Toast.LENGTH_LONG).show()
                             methodChannel.invokeMethod("onRecordingError", err)
                             result.error("RECORDING_FAILED", err, null)
                         } else {
-                            Log.d(TAG, "Recording saved: $uri")
-                            Toast.makeText(context, "Saved: $uri", Toast.LENGTH_SHORT).show()
-                            methodChannel.invokeMethod("onRecordingEnd", uri.toString())
-                            result.success(uri.toString())
+                            Log.d(TAG, "Recording saved: ${file.absolutePath}")
+                            Toast.makeText(context, "Saved: ${file.absolutePath}", Toast.LENGTH_SHORT).show()
+                            methodChannel.invokeMethod("onRecordingEnd", file.absolutePath)
+                            result.success(file.absolutePath)
                         }
                         recording = null
                     }
