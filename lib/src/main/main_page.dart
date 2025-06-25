@@ -38,6 +38,14 @@ class _MainPageState extends State<MainPage> {
               },
               child: const Text('Manage Recordings'),
             ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushNamed(  context,
+                    '/start-recording',
+                    arguments: "123_0_0");
+              },
+              child: const Text('PP'),
+            ),
             
           ],
         ),
