@@ -11,8 +11,8 @@ import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
-import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.Toast
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -34,69 +34,170 @@ import java.io.File
 @UnstableApi
 class MyCameraView(
     private val context: Context,
-    private val messenger: BinaryMessenger,
+    messenger: BinaryMessenger,
     private var creationParams: Map<String?, Any?>?,
     private val activity: FlutterActivity
 ) : PlatformView, DefaultLifecycleObserver {
 
-    private val rootView: FrameLayout = FrameLayout(context)
-    private val viewFinder = PreviewView(context)
-    private val recordButton = Button(context)
-    private var overlayEffect: OverlayEffect? = null
-    private var media3Effect: Media3Effect? = null
-    private var camera: Camera? = null
-    private var currentZoomRatio: Float = 1.0f
-    private var recording: Recording? = null
-    private var videoCapture: VideoCapture<Recorder>? = null
+    private val rootView = FrameLayout(context)
+    private val previewView = PreviewView(context)
+
+    private val cameraManager = CameraManager(context, activity, previewView)
+    private val overlayManager = OverlayManager()
+    private val videoRecorder = VideoRecorder(context)
+
     private val methodChannel = MethodChannel(messenger, "camera_overlay_channel")
+
+    private val recordButton = ImageButton(context).apply {
+       setBackgroundResource(R.drawable.circular_button)
+        setImageResource(android.R.drawable.ic_media_play)
+        val size = (64 * context.resources.displayMetrics.density).toInt() // 64dp size
+        layoutParams = FrameLayout.LayoutParams(size, size, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+            bottomMargin = (32 * context.resources.displayMetrics.density).toInt()
+        }
+        scaleType = ImageButton.ScaleType.CENTER_INSIDE
+        isClickable = true
+        isFocusable = true
+    }
+
+    private var isRecording = false
 
     init {
         activity.lifecycle.addObserver(this)
-        rootView.addView(viewFinder)
+        rootView.addView(previewView)
+        rootView.addView(recordButton)
+
         setupCamera()
         setupChannel()
         setupVolumeButtonZoom()
         setupRecordButton()
     }
 
-    override fun onPause(owner: LifecycleOwner) {
-        stopRecording()
-        releaseCameraResources()
-    }
-
-    override fun onResume(owner: LifecycleOwner) {
-        releaseCameraResources()
-        setupCamera()
-    }
-
-    private fun releaseCameraResources() {
-        try {
-            val cameraProvider = ProcessCameraProvider.getInstance(context).get()
-            cameraProvider.unbindAll()
-        } catch (e: Exception) {
-            Log.e("MyCameraView", "Failed to unbind camera", e)
+    private fun setupRecordButton() {
+        recordButton.setOnClickListener {
+            if (isRecording) {
+                val stopped = videoRecorder.stopRecording()
+                if (stopped) {
+                    Toast.makeText(context, "Recording stopped", Toast.LENGTH_SHORT).show()
+                    recordButton.setImageResource(android.R.drawable.ic_media_play)
+                    isRecording = false
+                }
+            } else {
+                val started = videoRecorder.startRecording(methodChannel)
+                if (started) {
+                    Toast.makeText(context, "Recording started", Toast.LENGTH_SHORT).show()
+                    recordButton.setImageResource(android.R.drawable.ic_media_pause)
+                    isRecording = true
+                }
+            }
         }
-        media3Effect?.release()
-        media3Effect = null
-        overlayEffect = null
-        videoCapture = null
-        recording = null
-        camera = null
     }
 
     private fun setupCamera() {
+        cameraManager.initialize { mediaEffect ->
+            videoRecorder.setMedia3Effect(mediaEffect)
+            videoRecorder.bindVideoCapture(cameraManager.getVideoCapture())
+            creationParams?.let { overlayManager.updateOverlayFromParams(it, mediaEffect) }
+        }
+    }
+
+    private fun setupChannel() {
+        methodChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "updateOverlay" -> {
+                    val updates = call.arguments as? Map<String, Any?>
+                    if (updates != null) {
+                        creationParams = (creationParams ?: emptyMap()).toMutableMap().apply {
+                            putAll(updates)
+                        }
+                        cameraManager.media3Effect?.let {
+                            overlayManager.updateOverlayFromParams(creationParams, it)
+                        }
+                        result.success(true)
+                    } else {
+                        result.error("INVALID", "Missing update data", null)
+                    }
+                }
+                "startRecording" -> {
+                    val started = videoRecorder.startRecording(methodChannel)
+                    if (started) {
+                        recordButton.setImageResource(android.R.drawable.ic_media_pause)
+                        isRecording = true
+                    }
+                    result.success(started)
+                }
+                "stopRecording" -> {
+                    val stopped = videoRecorder.stopRecording()
+                    if (stopped) {
+                        recordButton.setImageResource(android.R.drawable.ic_media_play)
+                        isRecording = false
+                    }
+                    result.success(stopped)
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    private fun setupVolumeButtonZoom() {
+        rootView.isFocusableInTouchMode = true
+        rootView.requestFocus()
+        rootView.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            when (keyCode) {
+                KeyEvent.KEYCODE_VOLUME_UP -> {
+                    cameraManager.zoomCamera(true)
+                    true
+                }
+                KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                    cameraManager.zoomCamera(false)
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    override fun onPause(owner: LifecycleOwner) {
+        videoRecorder.stopRecording()
+        cameraManager.releaseResources()
+    }
+
+    override fun onResume(owner: LifecycleOwner) {
+        cameraManager.releaseResources()
+        setupCamera()
+    }
+
+    override fun dispose() {
+        videoRecorder.stopRecording()
+        cameraManager.releaseResources()
+    }
+
+    override fun getView(): View = rootView
+}
+
+// CameraManager: manages camera setup and zoom
+class CameraManager(
+    private val context: Context,
+    private val activity: FlutterActivity,
+    private val previewView: PreviewView
+) {
+    var media3Effect: Media3Effect? = null
+        private set
+    private var camera: Camera? = null
+    private var videoCapture: VideoCapture<Recorder>? = null
+
+    fun initialize(onEffectReady: (Media3Effect) -> Unit) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
-
             val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(viewFinder.surfaceProvider)
+                it.setSurfaceProvider(previewView.surfaceProvider)
             }
 
             val recorder = Recorder.Builder()
                 .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
                 .build()
-
             videoCapture = VideoCapture.withOutput(recorder)
 
             val useCaseGroup = UseCaseGroup.Builder()
@@ -107,10 +208,9 @@ class MyCameraView(
                 context,
                 CameraEffect.PREVIEW or CameraEffect.VIDEO_CAPTURE,
                 ContextCompat.getMainExecutor(context)
-            ) {
-                Toast.makeText(context, "Media3 error: ${it.message}", Toast.LENGTH_LONG).show()
+            ) { error ->
+                Toast.makeText(context, "Media3 error: ${error.message}", Toast.LENGTH_LONG).show()
             }
-
             media3Effect?.let { useCaseGroup.addEffect(it) }
 
             try {
@@ -120,128 +220,15 @@ class MyCameraView(
                     CameraSelector.DEFAULT_BACK_CAMERA,
                     useCaseGroup.build()
                 )
-                currentZoomRatio = camera?.cameraInfo?.zoomState?.value?.zoomRatio ?: 1.0f
             } catch (e: Exception) {
-                Log.e("MyCameraView", "Camera bind failed", e)
+                Log.e("CameraManager", "Camera bind failed", e)
             }
 
-            applyOverlayFromParams()
-
+            media3Effect?.let(onEffectReady)
         }, ContextCompat.getMainExecutor(context))
     }
 
-    private fun applyOverlayFromParams() {
-        val overlays = mutableListOf<TextOverlay>()
-        val data = creationParams ?: return
-
-        val keys = data.keys.mapNotNull { it }.filter { it.endsWith("X") }.map { it.removeSuffix("X") }
-
-        keys.forEach { key ->
-            val text = data[key]?.toString() ?: return@forEach
-            val textSizePx = (data["${key}TextSizePx"] as? Int) ?: 22
-            val bgColor = parseColor(data["${key}BgColor"] as? String) ?: 0x88000000.toInt()
-            val fgColor = parseColor(data["${key}FgColor"] as? String) ?: 0xFFFFFFFF.toInt()
-            val x = (data["${key}X"] as? Double)?.toFloat() ?: 0f
-            val y = (data["${key}Y"] as? Double)?.toFloat() ?: 0f
-            overlays.add(createOverlay(text, x, y, bgColor, fgColor, textSizePx))
-        }
-
-        overlayEffect = OverlayEffect(ImmutableList.copyOf(overlays.map { it as TextureOverlay }))
-        media3Effect?.setEffects(listOf(overlayEffect!!))
-    }
-
-    private fun createOverlay(text: String, x: Float, y: Float, bgColor: Int, fgColor: Int, textSizePx: Int): TextOverlay {
-        return object : TextOverlay() {
-            override fun getText(presentationTimeUs: Long): SpannableString {
-                val spannable = SpannableString(text)
-                spannable.setSpan(BackgroundColorSpan(bgColor), 0, text.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
-                spannable.setSpan(ForegroundColorSpan(fgColor), 0, text.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
-                spannable.setSpan(AbsoluteSizeSpan(textSizePx, false), 0, text.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
-                return spannable
-            }
-
-            override fun getOverlaySettings(presentationTimeUs: Long): StaticOverlaySettings {
-                return StaticOverlaySettings.Builder()
-                    .setOverlayFrameAnchor(x, y)
-                    .setBackgroundFrameAnchor(x, y)
-                    .build()
-            }
-        }
-    }
-
-    private fun setupChannel() {
-        methodChannel.setMethodCallHandler { call, result ->
-            when (call.method) {
-                "updateOverlay" -> {
-                    val updates = call.arguments as? Map<String, Any?>
-                    if (updates != null) {
-                        val newParams = creationParams?.toMutableMap() ?: mutableMapOf()
-                        updates.forEach { (key, value) -> newParams[key] = value }
-                        creationParams = newParams
-                        applyOverlayFromParams()
-                        result.success(true)
-                    } else {
-                        result.error("INVALID", "Missing update data", null)
-                    }
-                }
-                "startRecording" -> {
-                    val started = startRecording()
-                    result.success(started)
-                }
-                "stopRecording" -> {
-                    val stopped = stopRecording()
-                    result.success(stopped)
-                }
-                else -> result.notImplemented()
-            }
-        }
-    }
-
-    private fun setupRecordButton() {
-        recordButton.text = "Record"
-        recordButton.setBackgroundColor(Color.RED)
-        recordButton.setTextColor(Color.WHITE)
-        val size = 200
-        val params = FrameLayout.LayoutParams(size, size)
-        params.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-        params.bottomMargin = 50
-        recordButton.layoutParams = params
-
-        recordButton.setOnClickListener {
-            if (recording == null) {
-                if (startRecording()) {
-                    recordButton.text = "Stop"
-                }
-            } else {
-                if (stopRecording()) {
-                    recordButton.text = "Record"
-                }
-            }
-        }
-
-        rootView.addView(recordButton)
-    }
-
-    private fun setupVolumeButtonZoom() {
-        rootView.isFocusableInTouchMode = true
-        rootView.requestFocus()
-        rootView.setOnKeyListener { _, keyCode, event ->
-            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
-            when (keyCode) {
-                KeyEvent.KEYCODE_VOLUME_UP -> {
-                    zoomCamera(true)
-                    true
-                }
-                KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                    zoomCamera(false)
-                    true
-                }
-                else -> false
-            }
-        }
-    }
-
-    private fun zoomCamera(zoomIn: Boolean) {
+    fun zoomCamera(zoomIn: Boolean) {
         camera?.let {
             val zoomState = it.cameraInfo.zoomState.value ?: return
             val zoomStep = 0.1f
@@ -249,13 +236,42 @@ class MyCameraView(
                 (zoomState.zoomRatio + zoomStep).coerceAtMost(zoomState.maxZoomRatio)
             else
                 (zoomState.zoomRatio - zoomStep).coerceAtLeast(zoomState.minZoomRatio)
-
             it.cameraControl.setZoomRatio(newZoom)
-            currentZoomRatio = newZoom
         }
     }
 
-    private fun startRecording(): Boolean {
+    fun getVideoCapture(): VideoCapture<Recorder>? = videoCapture
+
+    fun releaseResources() {
+        try {
+            val cameraProvider = ProcessCameraProvider.getInstance(context).get()
+            cameraProvider.unbindAll()
+        } catch (e: Exception) {
+            Log.e("CameraManager", "Failed to unbind camera", e)
+        }
+        media3Effect?.release()
+        media3Effect = null
+        camera = null
+        videoCapture = null
+    }
+}
+
+// VideoRecorder: manages start/stop video recording
+class VideoRecorder(private val context: Context) {
+
+    private var media3Effect: Media3Effect? = null
+    private var videoCapture: VideoCapture<Recorder>? = null
+    private var recording: Recording? = null
+
+    fun setMedia3Effect(effect: Media3Effect) {
+        this.media3Effect = effect
+    }
+
+    fun bindVideoCapture(videoCapture: VideoCapture<Recorder>?) {
+        this.videoCapture = videoCapture
+    }
+
+    fun startRecording(methodChannel: MethodChannel): Boolean {
         if (videoCapture == null || recording != null) {
             Toast.makeText(context, "Recording already in progress", Toast.LENGTH_SHORT).show()
             return false
@@ -289,7 +305,6 @@ class MyCameraView(
                             "Video saved: ${file.absolutePath}"
                         }
                         Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-                        recordButton.text = "Record"
                         recording = null
                     }
                 }
@@ -298,13 +313,67 @@ class MyCameraView(
         return true
     }
 
-    private fun stopRecording(): Boolean {
+    fun stopRecording(): Boolean {
         if (recording == null) {
             Toast.makeText(context, "No active recording", Toast.LENGTH_SHORT).show()
             return false
         }
         recording?.stop()
         return true
+    }
+}
+
+// OverlayManager: creates and updates overlay texts dynamically
+class OverlayManager {
+
+    fun updateOverlayFromParams(
+        creationParams: Map<String?, Any?>?,
+        effect: Media3Effect
+    ) {
+        val overlays = mutableListOf<TextOverlay>()
+        val data = creationParams ?: return
+
+        // Find keys that end with X (coordinate keys), then use base key name to get all props
+        val keys = data.keys.mapNotNull { it }.filter { it.endsWith("X") }.map { it.removeSuffix("X") }
+
+        keys.forEach { key ->
+            val text = data[key]?.toString() ?: return@forEach
+            val textSizePx = (data["${key}TextSizePx"] as? Int) ?: 22
+            val bgColor = parseColor(data["${key}BgColor"] as? String) ?: 0x88000000.toInt()
+            val fgColor = parseColor(data["${key}FgColor"] as? String) ?: 0xFFFFFFFF.toInt()
+            val x = (data["${key}X"] as? Double)?.toFloat() ?: 0f
+            val y = (data["${key}Y"] as? Double)?.toFloat() ?: 0f
+            overlays.add(createOverlay(text, x, y, bgColor, fgColor, textSizePx))
+        }
+
+        val overlayEffect = OverlayEffect(ImmutableList.copyOf(overlays.map { it as TextureOverlay }))
+        effect.setEffects(listOf(overlayEffect))
+    }
+
+    private fun createOverlay(
+        text: String,
+        x: Float,
+        y: Float,
+        bgColor: Int,
+        fgColor: Int,
+        textSizePx: Int
+    ): TextOverlay {
+        return object : TextOverlay() {
+            override fun getText(presentationTimeUs: Long): SpannableString {
+                return SpannableString(text).apply {
+                    setSpan(BackgroundColorSpan(bgColor), 0, text.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    setSpan(ForegroundColorSpan(fgColor), 0, text.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    setSpan(AbsoluteSizeSpan(textSizePx, false), 0, text.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
+                }
+            }
+
+            override fun getOverlaySettings(presentationTimeUs: Long): StaticOverlaySettings {
+                return StaticOverlaySettings.Builder()
+                    .setOverlayFrameAnchor(x, y)
+                    .setBackgroundFrameAnchor(x, y)
+                    .build()
+            }
+        }
     }
 
     private fun parseColor(colorStr: String?): Int? {
@@ -315,10 +384,5 @@ class MyCameraView(
         } catch (e: Exception) {
             null
         }
-    }
-
-    override fun getView(): View = rootView
-    override fun dispose() {
-        releaseCameraResources()
     }
 }
