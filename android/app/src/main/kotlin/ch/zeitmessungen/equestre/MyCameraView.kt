@@ -103,7 +103,7 @@ class MyCameraView(
             overlays.add(createOverlay(text, x, y))
         }
 
-        overlayEffect = OverlayEffect(ImmutableList.copyOf(overlays))
+        overlayEffect = OverlayEffect(ImmutableList.copyOf(overlays.map { it as TextureOverlay }))
         media3Effect?.setEffects(listOf(overlayEffect!!))
     }
 
