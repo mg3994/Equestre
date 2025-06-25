@@ -55,10 +55,15 @@ class _CameraOverlayViewState extends State<CameraOverlayView> {
 
   @override
   Widget build(BuildContext context) {
-    return AndroidView(
-      viewType: 'camera_overlay_view',
-      creationParams: const {}, // Optionally pass initial overlay
-      creationParamsCodec: const StandardMessageCodec(),
+    return Scaffold(
+      body: Container(
+        color: Colors.white,
+        child: AndroidView(
+          viewType: 'camera_overlay_view',
+          creationParams: const {}, // Optionally pass initial overlay
+          creationParamsCodec: const StandardMessageCodec(),
+        ),
+      ),
     );
   }
 }
