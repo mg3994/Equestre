@@ -13,3 +13,26 @@ For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
 
+```dart
+static const _channel = MethodChannel('equestre_plugin');
+
+Future<void> sendHorseData({
+  required String horseNumber,
+  required String horseName,
+  required String rider,
+  String? gap,
+  String? penalties,
+  String? time,
+  String? rank,
+}) async {
+  await _channel.invokeMethod('updateOverlay', {
+    'horseNumber': horseNumber,
+    'horseName': horseName,
+    'rider': rider,
+    'gap': gap ?? '',
+    'penalties': penalties ?? '',
+    'time': time ?? '',
+    'rank': rank ?? '',
+  });
+}
+```
