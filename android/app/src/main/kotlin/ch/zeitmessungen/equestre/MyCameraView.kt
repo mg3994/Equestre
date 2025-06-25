@@ -49,45 +49,28 @@ class MyCameraView(
 
     private val TAG = "MyCameraView"
     private val rootView = FrameLayout(context)
-    private val previewView = PreviewView(context)
+    private val viewFinder = PreviewView(context)
     private var media3Effect: Media3Effect? = null
-    private var currentOverlayConfigMap: Map<String, Any?> = initialCreationParams?.filterKeys { it != null }?.mapKeys { it.key!! } ?: emptyMap()
+    private var currentOverlayConfigMap: Map<String, Any?> =
+        initialCreationParams?.filterKeys { it != null }?.mapKeys { it.key!! } ?: emptyMap()
 
     private lateinit var methodChannel: MethodChannel
     private var cameraProvider: ProcessCameraProvider? = null
     private var useCaseGroup: UseCaseGroup? = null
     private lateinit var videoCapture: VideoCapture<Recorder>
     private var recording: Recording? = null
-    private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    private lateinit var cameraExecutor: ExecutorService
 
     init {
-        rootView.addView(previewView, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ))
+        rootView.addView(
+            viewFinder, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+        cameraExecutor = Executors.newSingleThreadExecutor()
         setupChannel()
         setupCamera()
-    }
-
-    private fun setupChannel() {
-        methodChannel = MethodChannel(messenger, "camera_overlay_channel")
-        methodChannel.setMethodCallHandler { call, result ->
-            when (call.method) {
-                "updateOverlay" -> {
-                    val updates = call.arguments as? Map<String?, Any?>
-                    if (updates != null) {
-                        currentOverlayConfigMap = updates.filterKeys { it != null }.mapKeys { it.key!! }
-                        applyCurrentOverlayConfig()
-                        result.success(true)
-                    } else {
-                        result.error("INVALID_ARGUMENT", "Overlay data is null or invalid", null)
-                    }
-                }
-                "startRecording" -> startRecording(result)
-                "stopRecording" -> stopRecording(result)
-                else -> result.notImplemented()
-            }
-        }
     }
 
     private fun setupCamera() {
@@ -96,7 +79,7 @@ class MyCameraView(
             cameraProvider = cameraProviderFuture.get()
 
             val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(previewView.surfaceProvider)
+                it.setSurfaceProvider(viewFinder.surfaceProvider)
             }
 
             val recorder = Recorder.Builder()
@@ -108,17 +91,17 @@ class MyCameraView(
                 context,
                 CameraEffect.PREVIEW or CameraEffect.VIDEO_CAPTURE,
                 ContextCompat.getMainExecutor(context)
-            ) { error ->
-                Log.e(TAG, "Media3Effect error: ${error.message}", error)
-                Toast.makeText(context, "Media3 error: ${error.message}", Toast.LENGTH_LONG).show()
+            ) {
+                Log.e(TAG, "Media3Effect error: ${it.message}", it)
+                Toast.makeText(context, "Media3 error: ${it.message}", Toast.LENGTH_LONG).show()
             }
 
             val useCaseGroupBuilder = UseCaseGroup.Builder()
                 .addUseCase(preview)
                 .addUseCase(videoCapture)
 
-            media3Effect?.let {
-                useCaseGroupBuilder.addEffect(it)
+            media3Effect?.let { effect ->
+                useCaseGroupBuilder.addEffect(effect)
             }
 
             useCaseGroup = useCaseGroupBuilder.build()
@@ -126,8 +109,12 @@ class MyCameraView(
 
             try {
                 cameraProvider?.unbindAll()
-                cameraProvider?.bindToLifecycle(activity as LifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, useCaseGroup!!)
-                Log.d(TAG, "Camera bound with effects")
+                cameraProvider?.bindToLifecycle(
+                    activity as LifecycleOwner,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    useCaseGroup!!
+                )
+                Log.d(TAG, "Camera bound with initial effects")
             } catch (e: Exception) {
                 Log.e(TAG, "Camera bind failed: ${e.message}", e)
                 Toast.makeText(context, "Failed to start camera: ${e.message}", Toast.LENGTH_LONG).show()
@@ -137,7 +124,8 @@ class MyCameraView(
 
     private fun applyCurrentOverlayConfig() {
         val overlays = mutableListOf<TextureOverlay>()
-        val keys = listOf("horseName", "horseNumber", "rider", "penalty", "timeTaken", "rank", "gapToBest", "liveMsg")
+        val keys =
+            listOf("horseName", "horseNumber", "rider", "penalty", "timeTaken", "rank", "gapToBest", "liveMsg")
         keys.mapNotNull { parseOverlayItem(it, currentOverlayConfigMap) }
             .forEach { overlays.add(it) }
 
@@ -180,6 +168,27 @@ class MyCameraView(
         }
     }
 
+    private fun setupChannel() {
+        methodChannel = MethodChannel(messenger, "camera_overlay_channel")
+        methodChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "updateOverlay" -> {
+                    val updates = call.arguments as? Map<String?, Any?>
+                    if (updates != null) {
+                        currentOverlayConfigMap = updates.filterKeys { it != null }.mapKeys { it.key!! }
+                        applyCurrentOverlayConfig()
+                        result.success(true)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "Overlay data is null or invalid", null)
+                    }
+                }
+                "startRecording" -> startRecording(result)
+                "stopRecording" -> stopRecording(result)
+                else -> result.notImplemented()
+            }
+        }
+    }
+
     private fun startRecording(result: MethodChannel.Result) {
         if (recording != null) {
             result.error("ALREADY_RECORDING", "Recording already in progress.", null)
@@ -187,55 +196,69 @@ class MyCameraView(
         }
 
         val name = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS", Locale.US).format(System.currentTimeMillis())
-        val contentValues = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
-            put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val contentValues = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
                 put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/EquestreVideos")
             }
-        }
-
-        val outputOptions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            MediaStoreOutputOptions.Builder(context.contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
+            val mediaStoreOutputOptions = MediaStoreOutputOptions.Builder(
+                context.contentResolver,
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            )
                 .setContentValues(contentValues)
                 .build()
-        } else {
-            val file = File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), "EquestreVideos")
-            file.mkdirs()
-            val videoFile = File(file, "$name.mp4")
-            FileOutputOptions.Builder(videoFile).build()
-        }
 
-        recording = videoCapture.output
-            .prepareRecording(context, outputOptions)
-            .withAudioEnabled()
-            .start(ContextCompat.getMainExecutor(context)) { event ->
-                when (event) {
-                    is VideoRecordEvent.Start -> {
-                        Log.d(TAG, "Recording started")
-                        methodChannel.invokeMethod("onRecordingStart", null)
-                    }
-                    is VideoRecordEvent.Finalize -> {
-                        if (event.hasError()) {
-                            val err = "Recording error: ${event.error}"
-                            Log.e(TAG, err)
-                            Toast.makeText(context, err, Toast.LENGTH_LONG).show()
-                            methodChannel.invokeMethod("onRecordingError", err)
-                            result.error("RECORDING_FAILED", err, null)
-                        } else {
-                            val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) event.outputResults.outputUri.toString()
-                                      else null
-                            Log.d(TAG, "Recording saved: $uri")
-                            Toast.makeText(context, "Saved: $uri", Toast.LENGTH_SHORT).show()
-                            methodChannel.invokeMethod("onRecordingEnd", uri)
-                            result.success(uri)
-                        }
-                        recording = null
-                    }
-                    else -> Log.d(TAG, "Record event: $event")
-                }
+            val pendingRecording: PendingRecording = videoCapture.output
+                .prepareRecording(context, mediaStoreOutputOptions)
+                .withAudioEnabled()
+
+            recording = pendingRecording.start(ContextCompat.getMainExecutor(context)) { event: VideoRecordEvent ->
+                handleRecordingEvent(event, name, result)
             }
+
+        } else {
+            val outputDir =
+                File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), "EquestreVideos").apply { if (!exists()) mkdirs() }
+            val file = File(outputDir, "$name.mp4")
+
+            val fileOutputOptions = FileOutputOptions.Builder(file).build()
+
+            val pendingRecording: PendingRecording = videoCapture.output
+                .prepareRecording(context, fileOutputOptions)
+                .withAudioEnabled()
+
+            recording = pendingRecording.start(ContextCompat.getMainExecutor(context)) { event: VideoRecordEvent ->
+                handleRecordingEvent(event, file.absolutePath, result)
+            }
+        }
         result.success(true)
+    }
+
+    private fun handleRecordingEvent(event: VideoRecordEvent, pathOrName: String, result: MethodChannel.Result) {
+        when (event) {
+            is VideoRecordEvent.Start -> {
+                Log.d(TAG, "Recording started")
+                methodChannel.invokeMethod("onRecordingStart", null)
+            }
+            is VideoRecordEvent.Finalize -> {
+                if (event.hasError()) {
+                    val err = "Recording error: ${event.error}"
+                    Log.e(TAG, err)
+                    Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                    methodChannel.invokeMethod("onRecordingError", err)
+                    result.error("RECORDING_FAILED", err, null)
+                } else {
+                    Log.d(TAG, "Recording saved: $pathOrName")
+                    Toast.makeText(context, "Saved: $pathOrName", Toast.LENGTH_SHORT).show()
+                    methodChannel.invokeMethod("onRecordingEnd", pathOrName)
+                    result.success(pathOrName)
+                }
+                recording = null
+            }
+            else -> Log.d(TAG, "Record event: $event")
+        }
     }
 
     private fun stopRecording(result: MethodChannel.Result) {
