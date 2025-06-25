@@ -23,7 +23,7 @@ class MainActivity : FlutterActivity() {
         flutterEngine
             .platformViewsController
             .registry
-            .registerViewFactory("cameraView", MyCameraViewFactory(this, flutterEngine.dartExecutor.binaryMessenger))
+            .registerViewFactory("camera_overlay_view", MyCameraViewFactory(this, flutterEngine.dartExecutor.binaryMessenger))
     }
 
     private fun checkAndRequestCameraPermission() {
