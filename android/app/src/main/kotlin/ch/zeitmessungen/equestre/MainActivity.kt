@@ -9,7 +9,6 @@ import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 
-class MainActivity : FlutterActivity()
 class MainActivity : FlutterActivity() {
 
     private val CAMERA_PERMISSION_REQUEST_CODE = 1001
