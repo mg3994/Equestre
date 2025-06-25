@@ -213,12 +213,12 @@ class MyCameraView(
             .start(ContextCompat.getMainExecutor(context)) { event ->
                 when (event) {
                     is VideoRecordEvent.Start -> {
-                        val uri = event.outputResults.outputUri
+                        val uri = event.outputUri
                         Log.d(TAG, "Recording started: $uri")
                         methodChannel.invokeMethod("onRecordingStart", uri.toString())
                     }
                     is VideoRecordEvent.Finalize -> {
-                        val uri = event.outputResults.outputUri
+                        val uri = event.outputUri
                         if (event.error != VideoRecordEvent.Finalize.ERROR_NONE) {
                             val err = "Recording error: ${event.error}"
                             Log.e(TAG, err)
