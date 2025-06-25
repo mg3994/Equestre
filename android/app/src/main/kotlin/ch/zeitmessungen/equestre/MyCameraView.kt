@@ -54,7 +54,7 @@ class MyCameraView(
         setupCamera()
         setupChannel()
         setupVolumeButtonZoom()
-        startOverlayUpdateListener()
+       // startOverlayUpdateListener()
     }
 
     override fun onPause(owner: LifecycleOwner) {
@@ -193,28 +193,28 @@ class MyCameraView(
         }
     }
 
-    private fun startOverlayUpdateListener() {
-        val handler = Handler(Looper.getMainLooper())
-        val updateRunnable = object : Runnable {
-            override fun run() {
-                val updatedData = mapOf(
-                    "horseName" to "Storm Fury ${System.currentTimeMillis() / 1000}",
-                    "rider" to "John Doe",
-                    "penalty" to "0.5s",
-                    "timeTaken" to "52.3s",
-                    "rank" to "2nd",
-                    "gapToBest" to "+1.3s",
-                    "liveMsg" to "Match Live"
-                )
-                val newParams = creationParams?.toMutableMap() ?: mutableMapOf()
-                updatedData.forEach { (k, v) -> newParams[k] = v }
-                creationParams = newParams
-                applyOverlayFromParams()
-                handler.postDelayed(this, 5000)
-            }
-        }
-        handler.post(updateRunnable)
-    }
+    // private fun startOverlayUpdateListener() {
+    //     val handler = Handler(Looper.getMainLooper())
+    //     val updateRunnable = object : Runnable {
+    //         override fun run() {
+    //             val updatedData = mapOf(
+    //                 "horseName" to "Storm Fury ${System.currentTimeMillis() / 1000}",
+    //                 "rider" to "John Doe",
+    //                 "penalty" to "0.5s",
+    //                 "timeTaken" to "52.3s",
+    //                 "rank" to "2nd",
+    //                 "gapToBest" to "+1.3s",
+    //                 "liveMsg" to "Match Live"
+    //             )
+    //             val newParams = creationParams?.toMutableMap() ?: mutableMapOf()
+    //             updatedData.forEach { (k, v) -> newParams[k] = v }
+    //             creationParams = newParams
+    //             applyOverlayFromParams()
+    //             handler.postDelayed(this, 5000)
+    //         }
+    //     }
+    //     handler.post(updateRunnable)
+    // }
 
     private fun setupVolumeButtonZoom() {
         rootView.isFocusableInTouchMode = true
