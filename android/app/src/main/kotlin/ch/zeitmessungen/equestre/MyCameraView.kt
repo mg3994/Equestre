@@ -1,11 +1,19 @@
 package ch.zeitmessungen.equestre
 
+import android.Manifest
+import android.content.ContentValues
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.provider.MediaStore
 import android.text.SpannableString
 import android.util.Log
+import android.view.Gravity
 import android.view.View
+import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.camera.core.CameraEffect
@@ -14,23 +22,20 @@ import androidx.camera.core.Preview
 import androidx.camera.core.UseCaseGroup
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.media3.effect.Media3Effect
-import androidx.camera.video.Quality
-import androidx.camera.video.QualitySelector
-import androidx.camera.video.Recorder
-import androidx.camera.video.VideoCapture
+import androidx.camera.video.*
 import androidx.camera.view.PreviewView
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.effect.OverlayEffect
-import androidx.media3.effect.TextOverlay
-import androidx.media3.effect.StaticOverlaySettings
+import androidx.media3.effect.*
 import com.google.common.collect.ImmutableList
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.platform.PlatformView
-import androidx.media3.effect.TextureOverlay
+import java.text.SimpleDateFormat
+import java.util.*
 
 @UnstableApi
 class MyCameraView(
@@ -45,8 +50,12 @@ class MyCameraView(
     private var overlayEffect: OverlayEffect? = null
     private var media3Effect: Media3Effect? = null
 
+    private var recording: Recording? = null
+    private var videoCapture: VideoCapture<Recorder>? = null
+
     init {
         rootView.addView(viewFinder)
+        addRecordButton()
         setupCamera()
         setupChannel()
         startOverlayUpdateListener()
@@ -64,11 +73,11 @@ class MyCameraView(
             val recorder = Recorder.Builder()
                 .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
                 .build()
-            val videoCapture = VideoCapture.withOutput(recorder)
+            videoCapture = VideoCapture.withOutput(recorder)
 
             val useCaseGroup = UseCaseGroup.Builder()
                 .addUseCase(preview)
-                .addUseCase(videoCapture)
+                .addUseCase(videoCapture!!)
 
             media3Effect = Media3Effect(
                 context,
@@ -118,6 +127,72 @@ class MyCameraView(
                     .build()
             }
         }
+    }
+
+    private fun addRecordButton() {
+        val recordButton = Button(context).apply {
+            text = "●"
+            textSize = 24f
+            setTextColor(android.graphics.Color.WHITE)
+            setBackgroundColor(android.graphics.Color.RED)
+            val size = 150
+            layoutParams = FrameLayout.LayoutParams(size, size).apply {
+                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                bottomMargin = 60
+            }
+        }
+
+        recordButton.setOnClickListener {
+            if (recording == null) {
+                startRecording()
+                recordButton.text = "■"
+            } else {
+                stopRecording()
+                recordButton.text = "●"
+            }
+        }
+
+        rootView.addView(recordButton)
+    }
+
+    private fun startRecording() {
+        if (videoCapture == null) return
+
+        val name = "equestre_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis())}"
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/Equestre")
+            }
+        }
+
+        val outputOptions = MediaStoreOutputOptions.Builder(
+            context.contentResolver,
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        )
+            .setContentValues(contentValues)
+            .build()
+
+        val pendingRecording = videoCapture!!.output
+            .prepareRecording(context, outputOptions)
+            .apply {
+                if (ActivityCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    withAudioEnabled()
+                }
+            }
+
+        recording = pendingRecording.start(ContextCompat.getMainExecutor(context)) { recordEvent ->
+            if (recordEvent is VideoRecordEvent.Finalize) {
+                Toast.makeText(context, "Saved: ${recordEvent.outputResults.outputUri}", Toast.LENGTH_LONG).show()
+                recording = null
+            }
+        }
+    }
+
+    private fun stopRecording() {
+        recording?.stop()
+        recording = null
     }
 
     private fun setupChannel() {
