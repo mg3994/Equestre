@@ -41,8 +41,8 @@ class _MainPageState extends State<MainPage> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pushNamed(  context,
-                    '/start-recording',
-                    arguments: "123_0_0");
+                    '/camera-overlay',
+                    );
               },
               child: const Text('PP'),
             ),

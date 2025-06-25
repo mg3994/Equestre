@@ -1,3 +1,4 @@
+import 'package:equestre/src/main/camera_overlay_view.dart';
 import 'package:equestre/src/main/main_page.dart' show MainPage;
 import 'package:equestre/src/recoding/manage.dart' show ManageRecordings;
 import 'package:equestre/src/recoding/start_recording.dart' show StartRecording;
@@ -47,6 +48,7 @@ class MyApp extends StatelessWidget {
       '/sports-events': (context) => SportsEvents(),
       '/gallery': (context) => ManageRecordings(),
       '/settings': (context) => Settings(),
+      '/camera-overlay': (context) => CameraOverlayView(),
     },
     onGenerateRoute: (settings) {
       if (settings.name == '/start-recording') {
