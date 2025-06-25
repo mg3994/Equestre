@@ -1,6 +1,7 @@
 package ch.zeitmessungen.equestre
 
 import android.content.Context
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.text.SpannableString
@@ -16,23 +17,18 @@ import androidx.camera.core.Preview
 import androidx.camera.core.UseCaseGroup
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.media3.effect.Media3Effect
-import androidx.camera.video.Quality
-import androidx.camera.video.QualitySelector
-import androidx.camera.video.Recorder
-import androidx.camera.video.VideoCapture
+import androidx.camera.video.*
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.effect.OverlayEffect
-import androidx.media3.effect.TextOverlay
-import androidx.media3.effect.StaticOverlaySettings
-import androidx.media3.effect.TextureOverlay
+import androidx.media3.effect.*
 import com.google.common.collect.ImmutableList
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.platform.PlatformView
+import java.io.File
 
 @UnstableApi
 class MyCameraView(
@@ -48,6 +44,8 @@ class MyCameraView(
     private var media3Effect: Media3Effect? = null
     private var camera: Camera? = null
     private var currentZoomRatio: Float = 1.0f
+    private var recording: Recording? = null
+    private var videoCapture: VideoCapture<Recorder>? = null
 
     init {
         rootView.addView(viewFinder)
@@ -69,11 +67,12 @@ class MyCameraView(
             val recorder = Recorder.Builder()
                 .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
                 .build()
-            val videoCapture = VideoCapture.withOutput(recorder)
+
+            videoCapture = VideoCapture.withOutput(recorder)
 
             val useCaseGroup = UseCaseGroup.Builder()
                 .addUseCase(preview)
-                .addUseCase(videoCapture)
+                .addUseCase(videoCapture!!)
 
             media3Effect = Media3Effect(
                 context,
@@ -113,7 +112,7 @@ class MyCameraView(
             Triple("timeTaken", 0.75f, -0.95f),
             Triple("rank", 0.85f, -0.95f),
             Triple("gapToBest", 0.95f, -0.95f),
-            Triple("liveMsg", 0.0f, 0.95f) // centered bottom
+            Triple("liveMsg", 0.0f, 0.95f)
         )
 
         entries.forEach { (key, x, y) ->
@@ -154,6 +153,17 @@ class MyCameraView(
                         result.error("INVALID", "Missing update data", null)
                     }
                 }
+
+                "startRecording" -> {
+                    startRecording()
+                    result.success(null)
+                }
+
+                "stopRecording" -> {
+                    stopRecording()
+                    result.success(null)
+                }
+
                 else -> result.notImplemented()
             }
         }
@@ -192,10 +202,12 @@ class MyCameraView(
                     zoomCamera(true)
                     true
                 }
+
                 KeyEvent.KEYCODE_VOLUME_DOWN -> {
                     zoomCamera(false)
                     true
                 }
+
                 else -> false
             }
         }
@@ -213,6 +225,51 @@ class MyCameraView(
             it.cameraControl.setZoomRatio(newZoom)
             currentZoomRatio = newZoom
         }
+    }
+
+    private fun startRecording() {
+        if (videoCapture == null || recording != null) {
+            Toast.makeText(context, "Recording already in progress", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val fileName = "equestre_${System.currentTimeMillis()}.mp4"
+        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val outputDir = File(downloadsDir, "Equestre")
+        if (!outputDir.exists()) outputDir.mkdirs()
+        val file = File(outputDir, fileName)
+
+        val outputOptions = FileOutputOptions.Builder(file).build()
+
+        recording = videoCapture!!.output
+            .prepareRecording(context, outputOptions)
+            .withAudioEnabled()
+            .start(ContextCompat.getMainExecutor(context)) { event ->
+                when (event) {
+                    is VideoRecordEvent.Start -> {
+                        Toast.makeText(context, "Recording started", Toast.LENGTH_SHORT).show()
+                    }
+
+                    is VideoRecordEvent.Finalize -> {
+                        val msg = if (event.hasError()) {
+                            "Recording error: ${event.error}"
+                        } else {
+                            "Video saved: ${file.absolutePath}"
+                        }
+                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                        recording = null
+                    }
+                }
+            }
+    }
+
+    private fun stopRecording() {
+        if (recording == null) {
+            Toast.makeText(context, "No active recording", Toast.LENGTH_SHORT).show()
+            return
+        }
+        recording?.stop()
+        recording = null
     }
 
     override fun getView(): View = rootView
