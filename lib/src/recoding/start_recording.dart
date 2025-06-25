@@ -160,7 +160,7 @@ class _StartRecordingState extends State<StartRecording> {
       body: Container(
         color: Colors.white,
         child: AndroidView(
-          viewType: 'cameraView',
+          viewType: 'camera_overlay_view',
           creationParams: {
             'horseNumber': '#07',
             'horseName': 'Thunder Bolt',

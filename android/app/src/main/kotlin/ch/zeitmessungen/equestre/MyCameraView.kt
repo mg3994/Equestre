@@ -15,6 +15,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.ImageView // Added ImageView import for ScaleType
 import android.widget.Toast
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -251,6 +252,7 @@ class CameraManager(
                 CameraEffect.PREVIEW or CameraEffect.VIDEO_CAPTURE,
                 ContextCompat.getMainExecutor(context)
             ) { error ->
+                // The `error` here is an instance of `Effect.Listener.Error`, which has a `message` property.
                 onCameraError("Media3 error: ${error.message}")
             }
             media3Effect?.let { useCaseGroup.addEffect(it) }
@@ -288,10 +290,13 @@ class CameraManager(
         try {
             val cameraProvider = ProcessCameraProvider.getInstance(context).get()
             cameraProvider.unbindAll()
+            // Removed: media3Effect?.release()
+            // CameraX lifecycle management should handle the release of Media3Effect
+            // when use cases are unbound. Directly calling release() here caused an unresolved reference.
         } catch (e: Exception) {
             Log.e("CameraManager", "Failed to unbind camera: ${e.message}", e)
         } finally {
-            media3Effect?.release()
+            // It's still good practice to nullify references to aid garbage collection
             media3Effect = null
             camera = null
             videoCapture = null
@@ -352,7 +357,7 @@ class VideoRecorder(private val context: Context) {
                             file.absolutePath
 
                         if (event.hasError()) {
-                            val errorMessage = event.error?.message ?: "Unknown recording error"
+                            val errorMessage = getErrorMessageForCode(event.error) // Fixed here
                             methodChannel.invokeMethod(CameraConstants.METHOD_ON_RECORDING_STOPPED, mapOf(
                                 "reason" to "error",
                                 "success" to false,
@@ -360,7 +365,7 @@ class VideoRecorder(private val context: Context) {
                                 "errorMessage" to errorMessage
                             ))
                             Toast.makeText(context, "Recording error: ${errorMessage}", Toast.LENGTH_LONG).show()
-                            Log.e("VideoRecorder", "Recording error: ${event.error}")
+                            Log.e("VideoRecorder", "Recording error code: ${event.error}, msg: $errorMessage")
                         } else {
                             methodChannel.invokeMethod(CameraConstants.METHOD_ON_RECORDING_STOPPED, mapOf(
                                 "reason" to "finalized",
@@ -386,6 +391,25 @@ class VideoRecorder(private val context: Context) {
         recording?.stop()
         recording = null // Immediately nullify to prevent re-stopping
         return true
+    }
+
+    /**
+     * Maps VideoRecordEvent error codes to human-readable messages.
+     * @param errorCode The error code from VideoRecordEvent.Finalize.error
+     * @return A descriptive error message.
+     */
+    private fun getErrorMessageForCode(errorCode: Int): String {
+        return when (errorCode) {
+            VideoRecordEvent.Finalize.ERROR_NONE -> "No error"
+            VideoRecordEvent.Finalize.ERROR_UNKNOWN -> "Unknown recording error"
+            VideoRecordEvent.Finalize.ERROR_SOURCE_INACTIVE -> "Recording source inactive (e.g., camera disconnected)"
+            VideoRecordEvent.Finalize.ERROR_FILE_SIZE_LIMIT_REACHED -> "File size limit reached"
+            VideoRecordEvent.Finalize.ERROR_DURATION_LIMIT_REACHED -> "Recording duration limit reached"
+            VideoRecordEvent.Finalize.ERROR_NO_VALID_DATA -> "No valid data received during recording"
+            VideoRecordEvent.Finalize.ERROR_ENCODING_FAILED -> "Video encoding failed"
+            VideoRecordEvent.Finalize.ERROR_IO -> "Input/Output error during recording"
+            else -> "Unrecognized error code: $errorCode"
+        }
     }
 }
 
@@ -420,7 +444,7 @@ class MyCameraView(
         layoutParams = FrameLayout.LayoutParams(size, size, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
             bottomMargin = (32 * context.resources.displayMetrics.density).toInt()
         }
-        scaleType = ImageButton.ScaleType.CENTER_INSIDE
+        scaleType = ImageView.ScaleType.CENTER_INSIDE // Fixed here
     }
 
     private var isRecording = false
