@@ -1,4 +1,4 @@
-package ch.zeitmessungen.equestreAdd commentMore actions
+package ch.zeitmessungen.equestreAdd 
 
 import android.Manifest
 import android.content.pm.PackageManager
