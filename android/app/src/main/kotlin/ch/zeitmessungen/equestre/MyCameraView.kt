@@ -1,16 +1,17 @@
 package ch.zeitmessungen.equestre
 
 import android.content.Context
+import android.graphics.Color
 import android.os.Environment
-import android.os.Handler
-import android.os.Looper
 import android.text.SpannableString
 import android.text.style.AbsoluteSizeSpan
 import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
 import android.util.Log
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
+import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.camera.core.*
@@ -40,6 +41,7 @@ class MyCameraView(
 
     private val rootView: FrameLayout = FrameLayout(context)
     private val viewFinder = PreviewView(context)
+    private val recordButton = Button(context)
     private var overlayEffect: OverlayEffect? = null
     private var media3Effect: Media3Effect? = null
     private var camera: Camera? = null
@@ -54,18 +56,11 @@ class MyCameraView(
         setupCamera()
         setupChannel()
         setupVolumeButtonZoom()
-        // startOverlayUpdateListener()
+        setupRecordButton()
     }
 
     override fun onPause(owner: LifecycleOwner) {
-        if (recording != null) {
-            recording?.stop()
-            methodChannel.invokeMethod("onRecordingStopped", mapOf(
-                "reason" to "paused",
-                "success" to true
-            ))
-            recording = null
-        }
+        stopRecording()
         releaseCameraResources()
     }
 
@@ -116,7 +111,6 @@ class MyCameraView(
                 Toast.makeText(context, "Media3 error: ${it.message}", Toast.LENGTH_LONG).show()
             }
 
-            applyOverlayFromParams()
             media3Effect?.let { useCaseGroup.addEffect(it) }
 
             try {
@@ -131,6 +125,8 @@ class MyCameraView(
                 Log.e("MyCameraView", "Camera bind failed", e)
             }
 
+            applyOverlayFromParams()
+
         }, ContextCompat.getMainExecutor(context))
     }
 
@@ -138,25 +134,16 @@ class MyCameraView(
         val overlays = mutableListOf<TextOverlay>()
         val data = creationParams ?: return
 
-        val entries = listOf(
-            Triple("horseNumber", -0.95f, 0.65f),
-            Triple("horseName", -0.95f, 0.75f),
-            Triple("rider", -0.95f, 0.85f),
-            Triple("penalty", 0.65f, -0.95f),
-            Triple("timeTaken", 0.75f, -0.95f),
-            Triple("rank", 0.85f, -0.95f),
-            Triple("gapToBest", 0.95f, -0.95f),
-            Triple("liveMsg", 0.0f, 0.95f)
-        )
+        val keys = data.keys.mapNotNull { it }.filter { it.endsWith("X") }.map { it.removeSuffix("X") }
 
-        entries.forEach { (key, x, y) ->
-            val value = data[key]?.toString()
-            if (!value.isNullOrBlank()) {
-                val textSizePx = (data["${key}TextSizePx"] as? Int) ?: 22
-                val bgColor = parseColor(data["${key}BgColor"] as? String) ?: 0x88000000.toInt()
-                val fgColor = parseColor(data["${key}FgColor"] as? String) ?: 0xFFFFFFFF.toInt()
-                overlays.add(createOverlay(value, x, y, bgColor, fgColor, textSizePx))
-            }
+        keys.forEach { key ->
+            val text = data[key]?.toString() ?: return@forEach
+            val textSizePx = (data["${key}TextSizePx"] as? Int) ?: 22
+            val bgColor = parseColor(data["${key}BgColor"] as? String) ?: 0x88000000.toInt()
+            val fgColor = parseColor(data["${key}FgColor"] as? String) ?: 0xFFFFFFFF.toInt()
+            val x = (data["${key}X"] as? Double)?.toFloat() ?: 0f
+            val y = (data["${key}Y"] as? Double)?.toFloat() ?: 0f
+            overlays.add(createOverlay(text, x, y, bgColor, fgColor, textSizePx))
         }
 
         overlayEffect = OverlayEffect(ImmutableList.copyOf(overlays.map { it as TextureOverlay }))
@@ -210,28 +197,30 @@ class MyCameraView(
         }
     }
 
-  //  private fun startOverlayUpdateListener() {
-  //      val handler = Handler(Looper.getMainLooper())
-  //      val updateRunnable = object : Runnable {
-  //          override fun run() {
-  //              val updatedData = mapOf(
-  //                  "horseName" to "Storm Fury ${System.currentTimeMillis() / 1000}",
-  //                  "rider" to "John Doe",
-  //                  "penalty" to "0.5s",
-  //                  "timeTaken" to "52.3s",
-  //                  "rank" to "2nd",
-  //                  "gapToBest" to "+1.3s",
-  //                  "liveMsg" to "Match Live"
-  //              )
-  //              val newParams = creationParams?.toMutableMap() ?: mutableMapOf()
-  //              updatedData.forEach { (k, v) -> newParams[k] = v }
-  //              creationParams = newParams
-  //              applyOverlayFromParams()
-  //              handler.postDelayed(this, 5000)
-  //          }
-  //      }
-  //      handler.post(updateRunnable)
-  //  }
+    private fun setupRecordButton() {
+        recordButton.text = "Record"
+        recordButton.setBackgroundColor(Color.RED)
+        recordButton.setTextColor(Color.WHITE)
+        val size = 200
+        val params = FrameLayout.LayoutParams(size, size)
+        params.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        params.bottomMargin = 50
+        recordButton.layoutParams = params
+
+        recordButton.setOnClickListener {
+            if (recording == null) {
+                if (startRecording()) {
+                    recordButton.text = "Stop"
+                }
+            } else {
+                if (stopRecording()) {
+                    recordButton.text = "Record"
+                }
+            }
+        }
+
+        rootView.addView(recordButton)
+    }
 
     private fun setupVolumeButtonZoom() {
         rootView.isFocusableInTouchMode = true
@@ -300,6 +289,7 @@ class MyCameraView(
                             "Video saved: ${file.absolutePath}"
                         }
                         Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                        recordButton.text = "Record"
                         recording = null
                     }
                 }
@@ -320,7 +310,7 @@ class MyCameraView(
     private fun parseColor(colorStr: String?): Int? {
         return try {
             if (colorStr != null && colorStr.startsWith("#")) {
-                android.graphics.Color.parseColor(colorStr)
+                Color.parseColor(colorStr)
             } else null
         } catch (e: Exception) {
             null
