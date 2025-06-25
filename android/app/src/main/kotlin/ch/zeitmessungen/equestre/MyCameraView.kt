@@ -202,13 +202,13 @@ class MyCameraView(
                 .build()
         } else {
             val file = File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), "EquestreVideos").apply { mkdirs() }
-            val uri = Uri.fromFile(File(file, "$name.mp4"))
-            MediaStoreOutputOptions.Builder(context.contentResolver, uri)
+            MediaStoreOutputOptions.Builder(context.contentResolver, Uri.fromFile(File(file, "$name.mp4")))
                 .setContentValues(contentValues)
                 .build()
         }
 
-        recording = videoCapture.output.prepareRecording(context, outputOptions)
+        recording = videoCapture.output
+            .prepareRecording(context, outputOptions)
             .withAudioEnabled()
             .start(ContextCompat.getMainExecutor(context)) { event ->
                 when (event) {
@@ -219,7 +219,7 @@ class MyCameraView(
                     }
                     is VideoRecordEvent.Finalize -> {
                         val uri = event.outputResults.outputUri
-                        if (event.hasError()) {
+                        if (event.error != VideoRecordEvent.Finalize.ERROR_NONE) {
                             val err = "Recording error: ${event.error}"
                             Log.e(TAG, err)
                             Toast.makeText(context, err, Toast.LENGTH_LONG).show()
