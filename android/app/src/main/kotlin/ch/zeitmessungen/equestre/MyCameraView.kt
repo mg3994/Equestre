@@ -407,7 +407,7 @@ class VideoRecorder(private val context: Context) {
             VideoRecordEvent.Finalize.ERROR_DURATION_LIMIT_REACHED -> "Recording duration limit reached"
             VideoRecordEvent.Finalize.ERROR_NO_VALID_DATA -> "No valid data received during recording"
             VideoRecordEvent.Finalize.ERROR_ENCODING_FAILED -> "Video encoding failed"
-            VideoRecordEvent.Finalize.ERROR_IO -> "Input/Output error during recording"
+            // VideoRecordEvent.Finalize.ERROR_IO -> "Input/Output error during recording"
             else -> "Unrecognized error code: $errorCode"
         }
     }
