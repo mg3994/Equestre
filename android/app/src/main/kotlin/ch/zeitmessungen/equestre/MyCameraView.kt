@@ -3,10 +3,10 @@ package ch.zeitmessungen.equestre
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Color
-import android.net.Uri // Still needed for Uri.fromFile in old API case
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
-import android.provider.MediaStore // For MediaStore.MediaColumns and MediaStore.Video.Media
+import android.provider.MediaStore
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.AbsoluteSizeSpan
@@ -16,20 +16,10 @@ import android.util.Log
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.Toast
-import androidx.camera.core.CameraEffect
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.Preview
-import androidx.camera.core.UseCaseGroup
+import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.media3.effect.Media3Effect
-import androidx.camera.video.FileOutputOptions // Explicitly import FileOutputOptions
-import androidx.camera.video.MediaStoreOutputOptions // Explicitly import MediaStoreOutputOptions
-import androidx.camera.video.Quality
-import androidx.camera.video.QualitySelector
-import androidx.camera.video.Recorder
-import androidx.camera.video.Recording
-import androidx.camera.video.VideoCapture // Explicitly import VideoCapture
-import androidx.camera.video.VideoRecordEvent // Explicitly import VideoRecordEvent
+import androidx.camera.video.*
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
@@ -45,7 +35,7 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.platform.PlatformView
 import java.io.File
 import java.text.SimpleDateFormat
-import java.util.Locale
+import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -128,7 +118,6 @@ class MyCameraView(
     private fun applyCurrentOverlayConfig() {
         val overlays = mutableListOf<TextureOverlay>()
         val keys = listOf("horseName", "horseNumber", "rider", "penalty", "timeTaken", "rank", "gapToBest", "liveMsg")
-        // Use mapNotNull to filter out null results from parseOverlayItem
         keys.mapNotNull { parseOverlayItem(it, currentOverlayConfigMap) }
             .forEach { overlays.add(it) }
 
@@ -165,7 +154,7 @@ class MyCameraView(
     private fun parseColor(hex: String?): Int? {
         return try {
             hex?.let { Color.parseColor(if (it.startsWith("#")) it else "#$it") }
-        } catch (e: IllegalArgumentException) { // Catch specific IllegalArgumentException for color parsing
+        } catch (e: Exception) {
             Log.e(TAG, "Invalid color: $hex", e)
             null
         }
@@ -199,29 +188,29 @@ class MyCameraView(
         }
 
         val name = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS", Locale.US).format(System.currentTimeMillis())
-        
-        // Define output options based on Android version
-        val outputOptions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val contentValues = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, name)
-                put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/EquestreVideos")
             }
-            // Use MediaStoreOutputOptions for Android Q and above
+        }
+
+        val outputOptions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             MediaStoreOutputOptions.Builder(context.contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
                 .setContentValues(contentValues)
                 .build()
         } else {
-            // For older Android versions, use FileOutputOptions
-            val outputDir = File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), "EquestreVideos")
-            if (!outputDir.exists()) outputDir.mkdirs()
-            val outputFile = File(outputDir, "$name.mp4")
-            FileOutputOptions.Builder(outputFile).build()
+            val file = File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), "EquestreVideos").apply { mkdirs() }
+            val uri = Uri.fromFile(File(file, "$name.mp4"))
+            MediaStoreOutputOptions.Builder(context.contentResolver, uri)
+                .setContentValues(contentValues)
+                .build()
         }
 
         recording = videoCapture.output.prepareRecording(context, outputOptions)
             .withAudioEnabled()
-            .start(ContextCompat.getMainExecutor(context)) { event: VideoRecordEvent -> // Explicitly define event type
+            .start(ContextCompat.getMainExecutor(context)) { event ->
                 when (event) {
                     is VideoRecordEvent.Start -> {
                         val uri = event.outputResults.outputUri
@@ -242,12 +231,12 @@ class MyCameraView(
                             methodChannel.invokeMethod("onRecordingEnd", uri.toString())
                             result.success(uri.toString())
                         }
-                        recording = null // Reset recording state after finalization
+                        recording = null
                     }
                     else -> Log.d(TAG, "Record event: $event")
                 }
             }
-        result.success(true) // Indicate that recording preparation started successfully
+        result.success(true)
     }
 
     private fun stopRecording(result: MethodChannel.Result) {
@@ -261,10 +250,9 @@ class MyCameraView(
     override fun getView(): View = rootView
 
     override fun dispose() {
-        Log.d(TAG, "MyCameraView disposed")
         cameraProvider?.unbindAll()
         cameraExecutor.shutdown()
-        recording?.close() // Close the current recording if it exists
+        recording?.close()
         methodChannel.setMethodCallHandler(null)
     }
 }
