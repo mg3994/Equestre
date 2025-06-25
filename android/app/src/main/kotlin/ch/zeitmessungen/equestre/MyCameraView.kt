@@ -128,7 +128,7 @@ class MyCameraView(
 
             override fun getOverlaySettings(presentationTimeUs: Long): StaticOverlaySettings {
                 return StaticOverlaySettings.Builder()
-                    .setOverlayFrameAnchor(x, y)
+                    .setOverlayFrameAnchor(x, y).setBackgroundFrameAnchor(x,y)
                     .build()
             }
         }

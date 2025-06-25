@@ -7,6 +7,8 @@ import 'dart:math';
 // import 'package:camerawesome/camerawesome_plugin.dart';
 // import 'package:camerawesome/pigeon.dart';
 // import 'package:equestre/utils/extensions/open.dart';
+import 'package:equestre/models/data.dart';
+import 'package:equestre/models/overlay_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
@@ -134,10 +136,18 @@ class _StartRecordingState extends State<StartRecording> {
         _horseNumber++;
         MethodChannel('camera_overlay_channel').invokeMethod(
           'updateOverlay',
-          {
-            'horseName': 'Storm Fury',
-            'rider': 'Rider: $_horseNumber John Doe'
-          },
+          overlayConfig.copyWith(horseNumber:OverlayItem(
+    text: '#$_horseNumber',
+    textSizePx: 26,
+    bgColor: '#AA111111',
+    fgColor: '#FFFFFF',
+    x: -0.9,
+    y: 0.65,
+  ), ).toMap()
+          // {
+          //   'horseName': 'Storm Fury',
+          //   'rider': 'Rider: $_horseNumber John Doe'
+          // },
         );
       });
     });
