@@ -2,7 +2,7 @@ package ch.zeitmessungen.equestre
 
 import android.content.Context
 import android.graphics.Color
-import android.graphics.Typeface
+import android.graphics.Typeface // Added Typeface import for potential future styling
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -41,11 +41,13 @@ import com.google.common.collect.ImmutableList
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.platform.PlatformView // IMPORTERT: PlatformView
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import android.content.ContentValues // Explicitly import ContentValues
 
 // Data class to hold parsed overlay item properties from Flutter
 data class ParsedOverlayItem(
@@ -61,18 +63,21 @@ data class ParsedOverlayItem(
 class MyCameraView(
     private val context: Context,
     private val messenger: BinaryMessenger,
-    initialCreationParams: Map<String?, Any?>?,
+    initialCreationParams: Map<String?, Any?>?, // Keep as Map<String?, Any?> for incoming
     private val activity: FlutterActivity
-) : PlatformView {
+) : PlatformView { // FIX 1 & 13 & 14: Implement PlatformView
 
     private val TAG = "MyCameraView"
     private val rootView: FrameLayout = FrameLayout(context)
     private val viewFinder = PreviewView(context)
     private var media3Effect: Media3Effect? = null
-    private var currentOverlayConfigMap: Map<String, Any?> = initialCreationParams ?: emptyMap()
+    // FIX 2 & 3: Use Map<String, Any?> for internal config by explicitly converting nullable keys to non-null
+    // This assumes Flutter always sends non-null String keys.
+    private var currentOverlayConfigMap: Map<String, Any?> = initialCreationParams?.filterKeys { it != null }?.mapKeys { it.key!! } ?: emptyMap()
+
     private lateinit var methodChannel: MethodChannel
     private var cameraProvider: ProcessCameraProvider? = null
-    private var useCaseGroup: UseCaseGroup? = null
+    private var useCaseGroup: UseCaseGroup? = null // This will be the built UseCaseGroup, not its builder
     private lateinit var videoCapture: VideoCapture<Recorder>
     private var recording: Recording? = null
     private lateinit var cameraExecutor: ExecutorService
@@ -111,17 +116,23 @@ class MyCameraView(
                 Toast.makeText(context, "Media3 error: ${it.message}", Toast.LENGTH_LONG).show()
             }
 
-            useCaseGroup = UseCaseGroup.Builder()
+            val useCaseGroupBuilder = UseCaseGroup.Builder()
                 .addUseCase(preview)
                 .addUseCase(videoCapture)
-                .build()
+
+            // FIX 4 & 5: Add effect to the UseCaseGroup.Builder BEFORE building the UseCaseGroup
+            media3Effect?.let { effect ->
+                useCaseGroupBuilder.addEffect(effect)
+            }
+
+            useCaseGroup = useCaseGroupBuilder.build() // Build the useCaseGroup after adding effect
 
             // Apply initial overlays from current configuration
-            applyCurrentOverlayConfig()
-            media3Effect?.let { useCaseGroup?.addEffect(it) } // Add effect to the use case group
+            applyCurrentOverlayConfig() // This sets the effects within media3Effect
 
             try {
                 cameraProvider?.unbindAll()
+                // Cast `activity` to `LifecycleOwner`. `FlutterActivity` extends `AppCompatActivity` which is a LifecycleOwner.
                 cameraProvider?.bindToLifecycle(activity as LifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, useCaseGroup!!)
                 Log.d(TAG, "Camera bound with initial effects")
             } catch (e: Exception) {
@@ -236,7 +247,7 @@ class MyCameraView(
                 return StaticOverlaySettings.Builder()
                     // Convert Flutter's 0.0-1.0 (top-left) coordinates to Media3's -1.0-1.0 (center is 0,0, top-right is 1,1, bottom-left is -1,-1)
                     // newX = 2 * oldX - 1
-                    // newY = 1 - 2 * oldY (Y-axis is inverted)
+                    // newY = 1 - 2 * oldY (Y-axis is inverted for Media3 vs UI coordinates)
                     .setOverlayFrameAnchor(
                         (2 * item.x!! - 1).toFloat(),
                         (1 - 2 * item.y!!).toFloat()
@@ -252,9 +263,10 @@ class MyCameraView(
         methodChannel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "updateOverlay" -> {
-                    val updates = call.arguments as? Map<String, Any?>
+                    val updates = call.arguments as? Map<String?, Any?>
                     if (updates != null) {
-                        currentOverlayConfigMap = updates // Store the entire new config map
+                        // FIX 2 & 3: Filter null keys and explicitly convert to non-nullable strings for storage
+                        currentOverlayConfigMap = updates.filterKeys { it != null }.mapKeys { it.key!! }
                         applyCurrentOverlayConfig() // Re-apply all overlays based on the new config
                         result.success(true)
                     } else {
@@ -280,7 +292,7 @@ class MyCameraView(
         }
 
         val name = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS", Locale.US).format(System.currentTimeMillis())
-        val contentValues = android.content.ContentValues().apply {
+        val contentValues = ContentValues().apply { // FIX 6: Use android.content.ContentValues
             put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -288,19 +300,20 @@ class MyCameraView(
             }
         }
 
-        // Prepare output options for the video file
-        val outputOptions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            FileOutputOptions.Builder(
+        val outputOptions: FileOutputOptions // Declare type explicitly
+
+        // FIX 6, 7, 8: Corrected FileOutputOptions.Builder usage
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            outputOptions = FileOutputOptions.Builder(
                 context.contentResolver,
                 android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
                 contentValues
             ).build()
         } else {
-            // For older APIs, save to a specific file path
             val outputDir = File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), "EquestreVideos")
             if (!outputDir.exists()) outputDir.mkdirs()
             val outputFile = File(outputDir, "$name.mp4")
-            FileOutputOptions.Builder(outputFile).build()
+            outputOptions = FileOutputOptions.Builder(outputFile).build()
         }
 
         recording = videoCapture.output
@@ -309,13 +322,13 @@ class MyCameraView(
             .start(ContextCompat.getMainExecutor(context)) { event ->
                 when (event) {
                     is VideoRecordEvent.Start -> {
-                        Log.d(TAG, "Recording started: ${event.outputResults.outputUri}")
-                        methodChannel.invokeMethod("onRecordingStart", event.outputResults.outputUri.toString())
-                        // Don't call result.success here, as it's a stream of events.
-                        // We'll respond to the Flutter `startRecording` call with success later.
+                        // FIX 9 & 10: Access properties directly from the event object
+                        Log.d(TAG, "Recording started: ${event.outputUri}")
+                        methodChannel.invokeMethod("onRecordingStart", event.outputUri.toString())
                     }
                     is VideoRecordEvent.Finalize -> {
-                        if (event.has             Error()) {
+                        // FIX 11 & 12: Check error property directly
+                        if (event.error != VideoRecordEvent.ERROR_NONE) { // Use VideoRecordEvent.ERROR_NONE for clarity
                             Log.e(TAG, "Recording failed: ${event.error}")
                             recording = null // Clear recording reference
                             val msg = "Video recording failed: ${event.error}"
@@ -323,12 +336,12 @@ class MyCameraView(
                             methodChannel.invokeMethod("onRecordingError", msg)
                             result.error("RECORDING_FAILED", msg, null) // Notify Flutter about failure
                         } else {
-                            val msg = "Video recording succeeded: ${event.outputResults.outputUri}"
+                            val msg = "Video recording succeeded: ${event.outputUri}" // FIX 9 & 10
                             Log.d(TAG, msg)
                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                             recording = null // Clear recording reference
-                            methodChannel.invokeMethod("onRecordingEnd", event.outputResults.outputUri.toString())
-                            result.success(event.outputResults.outputUri.toString()) // Notify Flutter about success
+                            methodChannel.invokeMethod("onRecordingEnd", event.outputUri.toString()) // FIX 9 & 10
+                            result.success(event.outputUri.toString()) // Notify Flutter about success
                         }
                     }
                     // Handle other events like Pause, Resume, Status
@@ -351,17 +364,19 @@ class MyCameraView(
         }
         Log.d(TAG, "Stopping recording...")
         recording?.stop() // This will trigger the VideoRecordEvent.Finalize event
-        recording = null // Clear the reference immediately
+        // Do NOT set recording = null here, let Finalize event handle it to ensure correct state.
         result.success(true)
     }
 
+    // FIX 13: Implement getView from PlatformView
     override fun getView(): View = rootView
 
+    // FIX 14: Implement dispose from PlatformView
     override fun dispose() {
         Log.d(TAG, "MyCameraView disposed")
         // Unbind use cases and release resources
         cameraProvider?.unbindAll()
-        media3Effect?.release() // Release Media3Effect resources
+        // FIX 15: Removed media3Effect?.release(). Media3Effect's lifecycle is managed by CameraX when added to UseCaseGroup.
         cameraExecutor.shutdown() // Shut down the executor service
         recording?.close() // Ensure any ongoing recording is closed
         methodChannel.setMethodCallHandler(null) // Unset method channel handler

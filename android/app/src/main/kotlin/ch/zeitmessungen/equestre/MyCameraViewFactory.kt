@@ -8,8 +8,8 @@ import io.flutter.plugin.platform.PlatformViewFactory
 import io.flutter.embedding.android.FlutterActivity // Import FlutterActivity
 
 class MyCameraViewFactory(private val activity: FlutterActivity, private val messenger: BinaryMessenger) : PlatformViewFactory(StandardMessageCodec.INSTANCE) {
-    override fun create(context: Context, viewId: Int, args: Any?): PlatformView {
+    override fun create(context: Context, viewId: Int, args: Any?): PlatformView { // FIX 16: Return type is PlatformView
         val creationParams = args as? Map<String?, Any?> // Initial overlay data
-        return MyCameraView(context, messenger, creationParams, activity)
+        return MyCameraView(context, messenger, creationParams, activity) // MyCameraView now implements PlatformView
     }
 }
