@@ -10,11 +10,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.Toast
-import androidx.camera.core.Camera
-import androidx.camera.core.CameraEffect
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.Preview
-import androidx.camera.core.UseCaseGroup
+import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.media3.effect.Media3Effect
 import androidx.camera.video.*
@@ -148,20 +144,20 @@ class MyCameraView(
                         updates.forEach { (key, value) -> newParams[key] = value }
                         creationParams = newParams
                         applyOverlayFromParams()
-                        result.success(null)
+                        result.success(true)
                     } else {
                         result.error("INVALID", "Missing update data", null)
                     }
                 }
 
                 "startRecording" -> {
-                    startRecording()
-                    result.success(null)
+                    val started = startRecording()
+                    result.success(started)
                 }
 
                 "stopRecording" -> {
-                    stopRecording()
-                    result.success(null)
+                    val stopped = stopRecording()
+                    result.success(stopped)
                 }
 
                 else -> result.notImplemented()
@@ -227,10 +223,10 @@ class MyCameraView(
         }
     }
 
-    private fun startRecording() {
+    private fun startRecording(): Boolean {
         if (videoCapture == null || recording != null) {
             Toast.makeText(context, "Recording already in progress", Toast.LENGTH_SHORT).show()
-            return
+            return false
         }
 
         val fileName = "equestre_${System.currentTimeMillis()}.mp4"
@@ -261,15 +257,18 @@ class MyCameraView(
                     }
                 }
             }
+
+        return true
     }
 
-    private fun stopRecording() {
+    private fun stopRecording(): Boolean {
         if (recording == null) {
             Toast.makeText(context, "No active recording", Toast.LENGTH_SHORT).show()
-            return
+            return false
         }
         recording?.stop()
         recording = null
+        return true
     }
 
     override fun getView(): View = rootView

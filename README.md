@@ -48,3 +48,9 @@ TimeInfo timeInfo = TimeInfo(seconds:0 , display: "00:00:00s");
     );
     GapToBestApi().updateGapToBest(gapToBestInfo);
 ```
+
+```dart
+final channel = MethodChannel('camera_overlay_channel');
+final bool started = await channel.invokeMethod('startRecording');
+final bool stopped = await channel.invokeMethod('stopRecording');
+```
